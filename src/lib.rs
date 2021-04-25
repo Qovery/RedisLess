@@ -1,7 +1,12 @@
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::ptr;
+use std::io::Error;
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+mod redis_protocol;
 
 #[repr(C)]
 pub struct RedisLess {
@@ -49,52 +54,109 @@ impl RedisLess {
     }
 }
 
+fn handle_request(redisless: &RedisLess, mut stream: &TcpStream) {
+    // TODO
+}
+
+#[repr(C)]
+pub struct Server {
+    redisless: Arc<RedisLess>,
+    send_state_ch: Sender<ServerState>,
+    recv_state_ch: Receiver<ServerState>,
+}
+
+enum ServerState {
+    Start,
+    Stop,
+}
+
+impl Server {
+    pub fn new(redisless: RedisLess) -> Self {
+        let (send_state_ch, recv_state_ch) = unbounded::<ServerState>();
+
+        let s = Server {
+            redisless: Arc::new(redisless),
+            send_state_ch,
+            recv_state_ch,
+        };
+
+        // TODO export conf
+        s._init_configuration("0.0.0.0:16379");
+
+        s
+    }
+
+    pub fn _init_configuration<A: Into<String>>(&self, addr: A) {
+        let addr = Arc::new(addr.into());
+        let redisless = self.redisless.clone();
+        let recv = self.recv_state_ch.clone();
+
+        thread::spawn(move || {
+            for server_state in recv {
+                let addr = addr.clone();
+                let redisless = redisless.clone();
+
+                match server_state {
+                    ServerState::Start => {
+                        let _ = thread::spawn(move || match TcpListener::bind(addr.as_str()) {
+                            Ok(listener) => {
+                                // listen incoming requests
+                                for stream in listener.incoming() {
+                                    let redisless = redisless.clone();
+
+                                    let _ = thread::spawn(move || match stream {
+                                        Ok(tcp_stream) => loop {
+                                            handle_request(redisless.as_ref(), &tcp_stream);
+                                        },
+                                        Err(err) => {
+                                            println!("{:?}", err);
+                                        }
+                                    });
+                                }
+                            }
+                            Err(err) => {
+                                println!("{:?}", err);
+                            }
+                        });
+                    }
+                    ServerState::Stop => {
+                        // TODO implement
+                    }
+                }
+            }
+        });
+    }
+
+    /// start server
+    pub fn start(&self) {
+        self.send_state_ch.send(ServerState::Start);
+    }
+
+    /// stop server
+    pub fn stop(&self) {
+        self.send_state_ch.send(ServerState::Stop);
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn redisless_new() -> *mut RedisLess {
     Box::into_raw(Box::new(RedisLess::new()))
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_set(
-    redisless: &mut RedisLess,
-    key: *const c_char,
-    value: *const c_char,
-) {
-    if key.is_null() || value.is_null() {
-        return;
-    }
-
-    let key_str = unsafe { CStr::from_ptr(key) };
-    let value_str = unsafe { CStr::from_ptr(value) };
-
-    if let Ok(key) = key_str.to_str() {
-        if let Ok(value) = value_str.to_str() {
-            redisless.set(key.as_bytes(), value.as_bytes());
-        }
-    }
+pub extern "C" fn redisless_server_new(redisless: RedisLess) -> *const Server {
+    Box::into_raw(Box::new(Server::new(redisless)))
 }
 
-// #[no_mangle]
-// pub extern "C" fn redisless_get(redisless: &mut RedisLess, key: *const c_char) -> *const c_char {
-//     if key.is_null() {
-//         return ptr::null();
-//     }
-//
-//     let key_str = unsafe { CStr::from_ptr(key) };
-//
-//     if let Ok(key) = key_str.to_str() {
-//         return match redisless.get(key.as_bytes()) {
-//             Some(x) => {
-//                 let ptr = CString::new("").unwrap();
-//                 let ptr = ptr.as_ptr();
-//                 unsafe { *ptr };
-//             }
-//             None => ptr::null(),
-//         };
-//     }
-//
-//     ptr::null()
-// }
+#[no_mangle]
+pub extern "C" fn redisless_server_start(server: &Server) {
+    server.start();
+}
+
+#[no_mangle]
+pub extern "C" fn redisless_server_stop(server: &Server) {
+    server.stop();
+}
 
 #[cfg(test)]
 mod tests {

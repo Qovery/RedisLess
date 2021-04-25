@@ -11,3 +11,4 @@ name = "redisless"
 crate-type = ["dylib"]
 
 [dependencies]
+crossbeam-channel = "0.5.1"

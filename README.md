@@ -54,11 +54,12 @@ redisless.stop_server()
 - [ ] Atomic operations
 - [ ] Multi-threaded
 - [ ] Memory off-load and disk persistence
-- [ ] Cluster mode with replication
+- [ ] Cluster mode with replication (RAFT)
 
 # Supported clients
-- [ ] Python
+- [ ] NodeJS
 - [ ] Golang
+- [ ] Python
 - [ ] Java
 
 # Performance
