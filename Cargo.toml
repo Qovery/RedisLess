@@ -12,3 +12,6 @@ crate-type = ["dylib"]
 
 [dependencies]
 crossbeam-channel = "0.5.1"
+
+[dev-dependencies]
+redis = "0.20.0"

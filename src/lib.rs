@@ -1,16 +1,14 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::io::Error;
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::ops::{Deref, DerefMut};
+use std::io::Write;
+use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
+use std::sync::Arc;
 use std::thread;
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
-mod redis_protocol;
+mod resp;
 
 #[repr(C)]
 pub struct RedisLess {
@@ -59,7 +57,7 @@ impl RedisLess {
 }
 
 fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
-    // TODO
+    stream.write(b"+OK");
 }
 
 #[repr(C)]
@@ -68,6 +66,7 @@ pub struct Server {
     recv_state_ch: Receiver<ServerState>,
 }
 
+#[derive(Eq, PartialEq)]
 enum ServerState {
     Start,
     Stop,
@@ -101,30 +100,28 @@ impl Server {
             let mut redisless = redisless;
 
             for server_state in start_state_recv {
-                match server_state {
-                    ServerState::Start => {
-                        match TcpListener::bind(addr.as_str()) {
-                            Ok(listener) => {
-                                // listen incoming requests
-                                for stream in listener.incoming() {
-                                    match stream {
-                                        Ok(tcp_stream) => {
-                                            while !(*stop_server).load(Ordering::Relaxed) {
-                                                handle_request(redisless.borrow_mut(), &tcp_stream);
-                                            }
+                if server_state == ServerState::Start {
+                    match TcpListener::bind(addr.as_str()) {
+                        Ok(listener) => {
+                            // listen incoming requests
+                            for stream in listener.incoming() {
+                                match stream {
+                                    Ok(tcp_stream) => {
+                                        while !(*stop_server).load(Ordering::Relaxed) {
+                                            // TODO support graceful shutdown
+                                            handle_request(redisless.borrow_mut(), &tcp_stream);
                                         }
-                                        Err(err) => {
-                                            println!("{:?}", err);
-                                        }
+                                    }
+                                    Err(err) => {
+                                        println!("{:?}", err);
                                     }
                                 }
                             }
-                            Err(err) => {
-                                println!("{:?}", err);
-                            }
-                        };
-                    }
-                    ServerState::Stop => {} // nothing
+                        }
+                        Err(err) => {
+                            println!("{:?}", err);
+                        }
+                    };
                 }
             }
         });
@@ -132,11 +129,8 @@ impl Server {
         thread::spawn(move || {
             // listen stop server signal
             for server_state in stop_state_recv {
-                match server_state {
-                    ServerState::Stop => {
-                        stop_server_th2.store(true, Ordering::Relaxed);
-                    }
-                    ServerState::Start => {} // nothing
+                if server_state == ServerState::Stop {
+                    stop_server_th2.store(true, Ordering::Relaxed);
                 }
             }
         });
@@ -144,12 +138,12 @@ impl Server {
 
     /// start server
     pub fn start(&self) {
-        self.send_state_ch.send(ServerState::Start);
+        let _ = self.send_state_ch.send(ServerState::Start);
     }
 
     /// stop server
     pub fn stop(&self) {
-        self.send_state_ch.send(ServerState::Stop);
+        let _ = self.send_state_ch.send(ServerState::Stop);
     }
 }
 
@@ -175,7 +169,7 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 
 #[cfg(test)]
 mod tests {
-    use crate::RedisLess;
+    use crate::{RedisLess, Server};
 
     #[test]
     fn test_set_get_and_del() {
@@ -185,5 +179,17 @@ mod tests {
         assert_eq!(redisless.del(b"key"), 1);
         assert_eq!(redisless.del(b"key"), 0);
         assert_eq!(redisless.get(b"does not exist"), None);
+    }
+
+    #[test]
+    fn test_redis_implementation() {
+        let redisless = RedisLess::new();
+        let server = Server::new(redisless);
+
+        server.start();
+
+        let redis_client = redis::Client::open("redis://127.0.0.1:16379/").unwrap();
+
+        server.stop();
     }
 }
