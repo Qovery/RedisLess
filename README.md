@@ -3,7 +3,7 @@ RedisLess is an embedded and scalable in-memory Redis-like library that act as a
 
 > RedisLess is the concatenation of Redis + Serverless.
 
-## Use cases
+## Why
 Developers often use Redis to share states between apps. The problem is that we need to set up a Redis server and manage it. RedisLess brings you the ease of use of Redis without the inconvenience - maintaining a server.
 
 What RedisLess is:
