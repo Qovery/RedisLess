@@ -73,12 +73,12 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
     match RedisProtocolParser::parse(&buf) {
         Ok((resp, _)) => match resp {
             RESP::Array(x) => match Command::parse(x) {
-                Some(Command::Set(k, v)) => {
+                Command::Set(k, v) => {
                     redisless.set(k.as_bytes(), v.as_bytes());
                     stream.write(b"+OK\r\n");
                     return;
                 }
-                Some(Command::Get(k)) => {
+                Command::Get(k) => {
                     if let Some(value) = redisless.get(k.as_bytes()) {
                         stream.write(
                             format!("+{}\r\n", std::str::from_utf8(value).unwrap()).as_bytes(),
@@ -89,13 +89,13 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
                     stream.write(b"-ERR key does not exist\r\n");
                     return;
                 }
-                Some(Command::Del(k)) => {
+                Command::Del(k) => {
                     let total_del = redisless.del(k.as_bytes());
                     stream.write(format!(":{}\r\n", total_del).as_bytes());
                     return;
                 }
-                None => {
-                    stream.write(b"-ERR error\r\n");
+                Command::NotSupported(m) | Command::Error(m) => {
+                    stream.write(format!("-ERR {}\r\n", m).as_bytes());
                     return;
                 }
             },
@@ -216,7 +216,7 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 
 #[cfg(test)]
 mod tests {
-    use redis::{Commands, FromRedisValue, RedisError, RedisResult};
+    use redis::{Commands, RedisResult};
 
     use crate::{RedisLess, Server};
 
@@ -251,6 +251,10 @@ mod tests {
 
         let x: u32 = con.del("key").unwrap();
         assert_eq!(x, 0);
+
+        let _: () = con.set("key2", "value2").unwrap();
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "value2");
 
         server.stop();
     }
