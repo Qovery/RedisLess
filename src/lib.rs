@@ -1,10 +1,14 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::io::Error;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::{Arc, Mutex};
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 use std::thread;
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 mod redis_protocol;
 
@@ -54,13 +58,12 @@ impl RedisLess {
     }
 }
 
-fn handle_request(redisless: &RedisLess, mut stream: &TcpStream) {
+fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
     // TODO
 }
 
 #[repr(C)]
 pub struct Server {
-    redisless: Arc<RedisLess>,
     send_state_ch: Sender<ServerState>,
     recv_state_ch: Receiver<ServerState>,
 }
@@ -75,53 +78,65 @@ impl Server {
         let (send_state_ch, recv_state_ch) = unbounded::<ServerState>();
 
         let s = Server {
-            redisless: Arc::new(redisless),
             send_state_ch,
             recv_state_ch,
         };
 
         // TODO export conf
-        s._init_configuration("0.0.0.0:16379");
+        s._init_configuration("0.0.0.0:16379", redisless);
 
         s
     }
 
-    pub fn _init_configuration<A: Into<String>>(&self, addr: A) {
-        let addr = Arc::new(addr.into());
-        let redisless = self.redisless.clone();
-        let recv = self.recv_state_ch.clone();
+    pub fn _init_configuration<A: Into<String>>(&self, addr: A, redisless: RedisLess) {
+        let addr = addr.into();
+        let start_state_recv = self.recv_state_ch.clone();
+        let stop_state_recv = self.recv_state_ch.clone();
+
+        let stop_server = Arc::new(AtomicBool::new(false));
+        let stop_server_th2 = stop_server.clone();
 
         thread::spawn(move || {
-            for server_state in recv {
-                let addr = addr.clone();
-                let redisless = redisless.clone();
+            let addr = addr;
+            let mut redisless = redisless;
 
+            for server_state in start_state_recv {
                 match server_state {
                     ServerState::Start => {
-                        let _ = thread::spawn(move || match TcpListener::bind(addr.as_str()) {
+                        match TcpListener::bind(addr.as_str()) {
                             Ok(listener) => {
                                 // listen incoming requests
                                 for stream in listener.incoming() {
-                                    let redisless = redisless.clone();
-
-                                    let _ = thread::spawn(move || match stream {
-                                        Ok(tcp_stream) => loop {
-                                            handle_request(redisless.as_ref(), &tcp_stream);
-                                        },
+                                    match stream {
+                                        Ok(tcp_stream) => {
+                                            while !(*stop_server).load(Ordering::Relaxed) {
+                                                handle_request(redisless.borrow_mut(), &tcp_stream);
+                                            }
+                                        }
                                         Err(err) => {
                                             println!("{:?}", err);
                                         }
-                                    });
+                                    }
                                 }
                             }
                             Err(err) => {
                                 println!("{:?}", err);
                             }
-                        });
+                        };
                     }
+                    ServerState::Stop => {} // nothing
+                }
+            }
+        });
+
+        thread::spawn(move || {
+            // listen stop server signal
+            for server_state in stop_state_recv {
+                match server_state {
                     ServerState::Stop => {
-                        // TODO implement
+                        stop_server_th2.store(true, Ordering::Relaxed);
                     }
+                    ServerState::Start => {} // nothing
                 }
             }
         });

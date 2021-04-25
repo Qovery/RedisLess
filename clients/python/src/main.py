@@ -7,4 +7,4 @@ if __name__ == '__main__':
     redisless = RedisLess()
     redisless.start_server()
     redisless.stop_server()
-
+    time.sleep(60)
