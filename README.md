@@ -14,8 +14,8 @@ What RedisLess is:
 
 What RedisLess is not:
 
-* Production ready - **WIP**
-* 1:1 Redis Server implementation
+* Production ready yet.
+* 1:1 Redis implementation.
 
 # Usage
 
@@ -50,7 +50,7 @@ redisless.stop_server()
 
 # Features
 - [ ] Compatible with the Redis API ([see details](REDIS_FEATURES.md))
-- [ ] Redis Server API compatible
+- [ ] Auto-discovery
 - [ ] Atomic operations
 - [ ] Multi-threaded
 - [ ] Memory off-load and disk persistence

@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Error, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -57,7 +57,16 @@ impl RedisLess {
 }
 
 fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
-    stream.write(b"+OK");
+    let mut buf = BufReader::new(stream);
+    let mut buf_ = [0; 512];
+
+    while let Ok(s) = buf.read(&mut buf_) {
+        if s < 512 {
+            break;
+        }
+    }
+
+    stream.write(b"+OK\r\n");
 }
 
 #[repr(C)]
@@ -73,7 +82,7 @@ enum ServerState {
 }
 
 impl Server {
-    pub fn new(redisless: RedisLess) -> Self {
+    pub fn new(redisless: RedisLess, port: u32) -> Self {
         let (send_state_ch, recv_state_ch) = unbounded::<ServerState>();
 
         let s = Server {
@@ -82,7 +91,7 @@ impl Server {
         };
 
         // TODO export conf
-        s._init_configuration("0.0.0.0:16379", redisless);
+        s._init_configuration(format!("127.0.0.1:{}", port), redisless);
 
         s
     }
@@ -154,7 +163,7 @@ pub extern "C" fn redisless_new() -> *mut RedisLess {
 
 #[no_mangle]
 pub extern "C" fn redisless_server_new(redisless: RedisLess) -> *const Server {
-    Box::into_raw(Box::new(Server::new(redisless)))
+    Box::into_raw(Box::new(Server::new(redisless, 16379)))
 }
 
 #[no_mangle]
@@ -169,8 +178,9 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{RedisLess, Server};
     use redis::{Commands, FromRedisValue};
+
+    use crate::{RedisLess, Server};
 
     #[test]
     fn test_set_get_and_del() {
@@ -184,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_redis_implementation() {
-        let server = Server::new(RedisLess::new());
+        let server = Server::new(RedisLess::new(), 16379);
 
         server.start();
 
