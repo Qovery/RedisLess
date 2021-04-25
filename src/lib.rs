@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Error, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -8,6 +8,10 @@ use std::thread;
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
+use crate::command::Command;
+use crate::resp::{RedisProtocolParser, RESP};
+
+mod command;
 mod resp;
 
 #[repr(C)]
@@ -57,13 +61,47 @@ impl RedisLess {
 }
 
 fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
-    let mut buf = BufReader::new(stream);
-    let mut buf_ = [0; 512];
+    let mut buf_reader = BufReader::new(stream);
+    let mut buf = [0; 512];
 
-    while let Ok(s) = buf.read(&mut buf_) {
+    while let Ok(s) = buf_reader.read(&mut buf) {
         if s < 512 {
             break;
         }
+    }
+
+    match RedisProtocolParser::parse(&buf) {
+        Ok((resp, _)) => match resp {
+            RESP::Array(x) => match Command::parse(x) {
+                Some(Command::Set(k, v)) => {
+                    redisless.set(k.as_bytes(), v.as_bytes());
+                    stream.write(b"+OK\r\n");
+                    return;
+                }
+                Some(Command::Get(k)) => {
+                    if let Some(value) = redisless.get(k.as_bytes()) {
+                        stream.write(
+                            format!("+{}\r\n", std::str::from_utf8(value).unwrap()).as_bytes(),
+                        );
+                        return;
+                    };
+
+                    stream.write(b"-ERR key does not exist\r\n");
+                    return;
+                }
+                Some(Command::Del(k)) => {
+                    let total_del = redisless.del(k.as_bytes());
+                    stream.write(format!(":{}\r\n", total_del).as_bytes());
+                    return;
+                }
+                None => {
+                    stream.write(b"-ERR error\r\n");
+                    return;
+                }
+            },
+            _ => {}
+        },
+        Err(err) => {}
     }
 
     stream.write(b"+OK\r\n");
@@ -178,7 +216,7 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 
 #[cfg(test)]
 mod tests {
-    use redis::{Commands, FromRedisValue};
+    use redis::{Commands, FromRedisValue, RedisError, RedisResult};
 
     use crate::{RedisLess, Server};
 
@@ -204,6 +242,9 @@ mod tests {
         let _: () = con.set("key", "value").unwrap();
         let x: String = con.get("key").unwrap();
         assert_eq!(x, "value");
+
+        let x: RedisResult<String> = con.get("not-existing-key");
+        assert_eq!(x.is_err(), true);
 
         let x: u32 = con.del("key").unwrap();
         assert_eq!(x, 1);
