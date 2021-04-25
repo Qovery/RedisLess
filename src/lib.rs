@@ -170,6 +170,7 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 #[cfg(test)]
 mod tests {
     use crate::{RedisLess, Server};
+    use redis::{Commands, FromRedisValue};
 
     #[test]
     fn test_set_get_and_del() {
@@ -183,12 +184,22 @@ mod tests {
 
     #[test]
     fn test_redis_implementation() {
-        let redisless = RedisLess::new();
-        let server = Server::new(redisless);
+        let server = Server::new(RedisLess::new());
 
         server.start();
 
         let redis_client = redis::Client::open("redis://127.0.0.1:16379/").unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let _: () = con.set("key", "value").unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
+
+        let x: u32 = con.del("key").unwrap();
+        assert_eq!(x, 1);
+
+        let x: u32 = con.del("key").unwrap();
+        assert_eq!(x, 0);
 
         server.stop();
     }
