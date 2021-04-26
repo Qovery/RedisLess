@@ -19,8 +19,7 @@ What RedisLess is not:
 
 # Usage
 
-## Library
-## Python
+## Python client
 
 ### Install
 ```bash
