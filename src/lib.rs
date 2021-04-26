@@ -74,12 +74,12 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
         Ok((resp, _)) => match resp {
             RESP::Array(x) => match Command::parse(x) {
                 Command::Set(k, v) => {
-                    redisless.set(k.as_bytes(), v.as_bytes());
+                    redisless.set(k.as_slice(), v.as_slice());
                     stream.write(b"+OK\r\n");
                     return;
                 }
                 Command::Get(k) => {
-                    if let Some(value) = redisless.get(k.as_bytes()) {
+                    if let Some(value) = redisless.get(k.as_slice()) {
                         stream.write(
                             format!("+{}\r\n", std::str::from_utf8(value).unwrap()).as_bytes(),
                         );
@@ -90,19 +90,23 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
                     return;
                 }
                 Command::Del(k) => {
-                    let total_del = redisless.del(k.as_bytes());
+                    let total_del = redisless.del(k.as_slice());
                     stream.write(format!(":{}\r\n", total_del).as_bytes());
                     return;
                 }
-                Command::NotSupported(m) | Command::Error(m) => {
+                Command::NotSupported(m) => {
+                    stream.write(format!("-ERR {}\r\n", m).as_bytes());
+                    return;
+                }
+                Command::Error(m) => {
                     stream.write(format!("-ERR {}\r\n", m).as_bytes());
                     return;
                 }
             },
             _ => {}
         },
-        Err(err) => {}
-    }
+        _ => {}
+    };
 
     stream.write(b"+OK\r\n");
 }
