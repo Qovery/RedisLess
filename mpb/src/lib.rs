@@ -3,6 +3,7 @@ use std::thread;
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
+/// Multi-Producer Broadcast to do many to many (N*N) message passing.
 pub struct MPB<X>
 where
     X: Clone + Send + Sync + 'static,
