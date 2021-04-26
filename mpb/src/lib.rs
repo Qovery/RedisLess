@@ -10,7 +10,6 @@ where
 {
     sender: Sender<X>,
     internal_senders: Arc<Mutex<Vec<Sender<X>>>>,
-    receivers: Vec<Receiver<X>>,
 }
 
 impl<X> MPB<X>
@@ -23,7 +22,6 @@ where
         let mpb = MPB {
             sender: tx,
             internal_senders: Arc::new(Mutex::new(vec![])),
-            receivers: vec![],
         };
 
         mpb._init(rx);
@@ -37,7 +35,7 @@ where
         let _ = thread::spawn(move || {
             let senders = internal_senders;
 
-            for msg in rx.recv() {
+            for msg in rx {
                 match senders.lock() {
                     Ok(s) => {
                         for sender in s.iter() {
@@ -54,7 +52,7 @@ where
         self.sender.clone()
     }
 
-    pub fn rx(&mut self) -> Receiver<X> {
+    pub fn rx(&self) -> Receiver<X> {
         let (_tx, rx) = unbounded();
 
         match self.internal_senders.lock() {

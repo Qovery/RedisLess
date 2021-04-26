@@ -1,17 +1,16 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
+use std::{io, thread};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use mpb::MPB;
 
 use crate::command::Command;
 use crate::resp::{RedisProtocolParser, RESP};
-use bus::Bus;
 
 mod command;
 mod resp;
@@ -77,31 +76,31 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
             RESP::Array(x) => match Command::parse(x) {
                 Command::Set(k, v) => {
                     redisless.set(k.as_slice(), v.as_slice());
-                    stream.write(b"+OK\r\n");
+                    let _ = stream.write(b"+OK\r\n");
                     return;
                 }
                 Command::Get(k) => {
                     if let Some(value) = redisless.get(k.as_slice()) {
-                        stream.write(
+                        let _ = stream.write(
                             format!("+{}\r\n", std::str::from_utf8(value).unwrap()).as_bytes(),
                         );
                         return;
                     };
 
-                    stream.write(b"-ERR key does not exist\r\n");
+                    let _ = stream.write(b"-ERR key does not exist\r\n");
                     return;
                 }
                 Command::Del(k) => {
                     let total_del = redisless.del(k.as_slice());
-                    stream.write(format!(":{}\r\n", total_del).as_bytes());
+                    let _ = stream.write(format!(":{}\r\n", total_del).as_bytes());
                     return;
                 }
                 Command::NotSupported(m) => {
-                    stream.write(format!("-ERR {}\r\n", m).as_bytes());
+                    let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
                     return;
                 }
                 Command::Error(m) => {
-                    stream.write(format!("-ERR {}\r\n", m).as_bytes());
+                    let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
                     return;
                 }
             },
@@ -110,13 +109,12 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
         _ => {}
     };
 
-    stream.write(b"+OK\r\n");
+    let _ = stream.write(b"+OK\r\n");
 }
 
 #[repr(C)]
 pub struct Server {
-    send_state_ch: Sender<ServerState>,
-    recv_state_ch: Receiver<ServerState>,
+    bus: MPB<ServerState>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -129,27 +127,20 @@ pub enum ServerState {
     Error(String),
 }
 
+pub struct StateMove<T>(T, T);
+
 impl Server {
     pub fn new(redisless: RedisLess, port: u32) -> Self {
-        let (send_state_ch, recv_state_ch) = unbounded::<ServerState>();
-        let mut bus: Bus<ServerState> = Bus::new(100);
-
-        let s = Server {
-            send_state_ch,
-            recv_state_ch,
-        };
-
-        // TODO export conf
+        let s = Server { bus: MPB::new() };
         s._init_configuration(format!("127.0.0.1:{}", port), redisless);
-
         s
     }
 
     pub fn _init_configuration<A: Into<String>>(&self, addr: A, redisless: RedisLess) {
         let addr = addr.into();
-        let state_send = self.send_state_ch.clone();
-        let start_state_recv = self.recv_state_ch.clone();
-        let stop_state_recv = self.recv_state_ch.clone();
+        let state_send = self.bus.tx();
+        let start_state_recv = self.bus.rx();
+        let stop_state_recv = self.bus.rx();
 
         let stop_server = Arc::new(AtomicBool::new(false));
         let stop_server_th2 = stop_server.clone();
@@ -158,85 +149,101 @@ impl Server {
             let addr = addr;
             let mut redisless = redisless;
 
-            for server_state in start_state_recv {
-                if server_state == ServerState::Start {
-                    match TcpListener::bind(addr.as_str()) {
-                        Ok(listener) => {
-                            // notify that the server has been started
-                            let _ = state_send.send(ServerState::Started);
+            loop {
+                if let Ok(server_state) = start_state_recv.recv() {
+                    if server_state == ServerState::Start {
+                        match TcpListener::bind(addr.as_str()) {
+                            Ok(listener) => {
+                                // notify that the server has been started
+                                let _ = state_send.send(ServerState::Started);
 
-                            // listen incoming requests
-                            for stream in listener.incoming() {
-                                match stream {
-                                    Ok(tcp_stream) => {
-                                        while !(*stop_server).load(Ordering::Relaxed) {
-                                            // TODO support graceful shutdown
-                                            handle_request(redisless.borrow_mut(), &tcp_stream);
+                                // listen incoming requests
+                                for stream in listener.incoming() {
+                                    match stream {
+                                        Ok(tcp_stream) => {
+                                            while !stop_server.load(Ordering::Relaxed) {
+                                                // TODO support graceful shutdown
+                                                handle_request(redisless.borrow_mut(), &tcp_stream);
+                                            }
+
+                                            if stop_server.load(Ordering::Relaxed) {
+                                                break;
+                                            }
+                                        }
+                                        Err(err) => {
+                                            state_send
+                                                .send(ServerState::Error(format!("{:?}", err)));
                                         }
                                     }
-                                    Err(err) => {
-                                        state_send.send(ServerState::Error(format!("{:?}", err)));
-                                    }
                                 }
-                            }
 
-                            // notify that the server has been stopped
-                            let _ = state_send.send(ServerState::Stopped);
-                        }
-                        Err(err) => {
-                            state_send.send(ServerState::Error(format!("{:?}", err)));
-                        }
-                    };
+                                // notify that the server has been stopped
+                                let _ = state_send.send(ServerState::Stopped);
+                            }
+                            Err(err) => {
+                                state_send.send(ServerState::Error(format!("{:?}", err)));
+                            }
+                        };
+                    }
                 }
             }
         });
 
         thread::spawn(move || {
             // listen stop server signal
-            for server_state in stop_state_recv {
-                if server_state == ServerState::Stop {
-                    stop_server_th2.store(true, Ordering::Relaxed);
+            loop {
+                if let Ok(server_state) = stop_state_recv.recv() {
+                    if server_state == ServerState::Stop {
+                        stop_server_th2.store(true, Ordering::Relaxed);
+                    }
                 }
             }
         });
     }
 
-    fn change_state(&self, change_to: ServerState) -> ServerState {
-        let send_state_ch = self.send_state_ch.clone();
+    fn change_state(&self, change_to: ServerState) -> Option<ServerState> {
+        let send_state_ch = self.bus.tx();
 
         let post_change_to_state = match change_to {
-            ServerState::Start => Some(ServerState::Started),
-            ServerState::Stop => Some(ServerState::Stopped),
+            ServerState::Start => ServerState::Started,
+            ServerState::Stop => ServerState::Stopped,
             ServerState::Started
             | ServerState::Stopped
             | ServerState::Timeout
-            | ServerState::Error(_) => None,
+            | ServerState::Error(_) => return None,
         };
 
-        let change_to_th1 = change_to.clone();
-
         let _ = thread::spawn(move || {
-            let _ = thread::sleep(Duration::from_millis(1000));
-            let _ = send_state_ch.send(change_to_th1);
+            let _ = thread::sleep(Duration::from_millis(100));
+            let _ = send_state_ch.send(change_to);
         });
 
         // wait for changing state
-        for server_state in self.recv_state_ch.recv_timeout(Duration::from_secs(10)) {
-            if Some(&server_state) == post_change_to_state.as_ref() {
-                return server_state;
+        let rx = self.bus.rx();
+
+        loop {
+            match rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(server_state) => {
+                    if server_state == post_change_to_state {
+                        return Some(server_state);
+                    }
+                }
+                Err(_) => {
+                    break;
+                }
             }
         }
 
-        ServerState::Timeout
+        Some(ServerState::Timeout)
     }
 
     /// start server
-    pub fn start(&self) -> ServerState {
+    pub fn start(&self) -> Option<ServerState> {
         self.change_state(ServerState::Start)
     }
 
     /// stop server
-    pub fn stop(&self) -> ServerState {
+    pub fn stop(&self) -> Option<ServerState> {
         self.change_state(ServerState::Stop)
     }
 }
@@ -281,7 +288,7 @@ mod tests {
     fn test_redis_implementation() {
         let server = Server::new(RedisLess::new(), 16379);
 
-        assert_eq!(server.start(), ServerState::Started);
+        assert_eq!(server.start(), Some(ServerState::Started));
 
         let redis_client = redis::Client::open("redis://127.0.0.1:16379/").unwrap();
         let mut con = redis_client.get_connection().unwrap();
@@ -303,6 +310,6 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        assert_eq!(server.stop(), ServerState::Stopped);
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 }

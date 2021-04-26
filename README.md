@@ -1,4 +1,7 @@
 # RedisLess
+
+<a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
+
 RedisLess is an embedded and scalable in-memory Redis-like library that act as a Redis Server and is compatible with the Redis API.
 
 > RedisLess is the concatenation of Redis + Serverless.
