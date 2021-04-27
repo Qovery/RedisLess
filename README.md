@@ -26,12 +26,13 @@ What RedisLess is not:
 
 # How to use it?
 
-## I am using Redis
-To
+To use RedisLess, you only need to:
 
-## I am not using Redis
+1. Install RedisLess library (see supported clients below).
+2. Connect your favorite Redis client to `redis://localhost:16379`.
+3. You don't need to change your code - RedisLess is Redis API compatible. (see [supported Redis commands](REDIS_FEATURES.md))
 
-# 
+Under the hood, the RedisLess library starts a local Redis API compatible instance on port `16739` (you can change the port).
 
 ## NodeJS client
 
@@ -46,7 +47,7 @@ npm install redis
 
 ### Usage
 ```js
-
+/* in progress */
 ```
 
 ## Python client
