@@ -22,14 +22,14 @@ class RedisLess(object):
         self._redisless = self._C.redisless_new()
         self._redisless_server = self._C.redisless_server_new(self._redisless)
 
-    def start_server(self):
+    def start(self):
         """
         Start local embedded RedisLess instance
         :return:
         """
         self._C.redisless_server_start(self._redisless_server)
 
-    def stop_server(self):
+    def stop(self):
         """
         Stop local embedded RedisLess instance
         :return:

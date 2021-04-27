@@ -1,62 +1,91 @@
 # RedisLess
+===========
 
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 
-RedisLess is an embedded and scalable in-memory Redis-like library that act as a Redis Server and is compatible with the Redis API.
+**RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with the Redis API.**
 
-> RedisLess is the concatenation of Redis + Serverless.
+*[What is Redis?](https://redis.io/topics/introduction)*
+
+> RedisLess is the concatenation of Redis and Serverless.
 
 ## Why
-Developers often use Redis to share data and states between apps. The problem is that we need to set up a Redis server and manage it. Worst, scaling out Redis on multiple nodes is a nightmare. RedisLess brings you the ease of use of Redis without the inconvenience.
+As developers, we often use Redis to share data and states between apps. The problem is that we need to set up a Redis server and manage it. Worst, scaling out Redis on multiple nodes is a nightmare. RedisLess brings you the ease of use of Redis without the inconvenience - directly from your code and without any server to manage.
 
 What RedisLess is:
 
 * Embedded in-memory. (No Redis server required!).
-* Built with DX and performance in mind.
 * Compatible with the Redis API (RESP).
+* Built with DX and performance in mind.
+* Cloud native friendly.
 
 What RedisLess is not:
 
 * Production ready yet.
 * 1:1 Redis implementation.
 
-# Usage
+# How to use it?
+
+## I am using Redis
+To
+
+## I am not using Redis
+
+# 
+
+## NodeJS client
+
+### Install
+```bash
+# RedisLess library with Python binding
+npm install redisless
+
+# redis client
+npm install redis
+```
+
+### Usage
+```js
+
+```
 
 ## Python client
 
 ### Install
 ```bash
-pip install redisless # RedisLess library with Python binding
-pip install redis # redis client
+# RedisLess library with Python binding
+pip install redisless
+
+# redis client
+pip install redis
 ```
 
 ### Usage
+
 ```python
 from redisless import RedisLess
 import redis
 
 redisless = RedisLess()
 
-# start RedisLess embedded local server
-redisless.start_server()
+# start RedisLess embedded instance
+redisless.start()
 
 # Connect to RedisLess on localhost:16379
 redis = redis.Redis(host='localhost', port=16379, db=0)
 
 redis.set('foo', 'bar')
-redis.get('foo') # return bar 
+redis.get('foo')  # return bar 
 
-# stop RedisLess embedded local server
-redisless.stop_server()
+# stop RedisLess embedded instance
+redisless.stop()
 ```
 
 # Features
-- [ ] Compatible with the Redis API ([see details](REDIS_FEATURES.md))
+- [ ] Redis API ([see implemented features](REDIS_FEATURES.md))
+- [ ] Cluster mode
 - [ ] Auto-discovery
-- [ ] Atomic operations
-- [ ] Multi-threaded
-- [ ] Memory off-load and disk persistence
-- [ ] Cluster mode with replication (RAFT)
+- [ ] Disk persistence
 
 # Supported clients
 - [ ] NodeJS
@@ -64,11 +93,16 @@ redisless.stop_server()
 - [ ] Python
 - [ ] Java
 
-# Performance
+# Design
 TODO
 
+# Performance
+Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a minimum strain on your server resources (benchmarks will come soon).
+
+RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide clients for NodeJS, Python, Golang, Java, and Rust. Adding the support of another language is straightforward - supporting a new language can be done in 5 minutes. Look at [Python](clients/python) and [NodeJS](clients/nodejs) clients implementation for inspiration.
+
 # Contribution welcome!
-TODO
+It is never too soon to contribute to a great project. If you are interested in contributing, please join us on Discord, then we can discuss. The project is in its early days, but we are serious about building a solid library to help thousands of developers.
 
 # References
 

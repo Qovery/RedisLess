@@ -1,0 +1,22 @@
+{
+  "name": "redisless",
+  "version": "1.0.0",
+  "description": "RedisLess in an embedded and scalable in-memory Redis-like library",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "redis"
+  ],
+  "author": "Romaric Philogene <rphilogene@qovery.com> (https://www.qovery.com)",
+  "license": "ISC",
+  "engines": {
+    "node": "12.21.0",
+    "npm": "6.14.11"
+  },
+  "dependencies": {
+    "node-gyp": "^8.0.0",
+    "ffi": "^2.2.0"
+  }
+}

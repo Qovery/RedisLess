@@ -275,6 +275,8 @@ mod tests {
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
         RedisLess, Server, ServerState,
     };
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn start_and_stop_server_from_c_binding() {
@@ -325,6 +327,6 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        //assert_eq!(server.stop(), Some(ServerState::Stopped));
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 }
