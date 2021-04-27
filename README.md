@@ -3,9 +3,7 @@ RedisLess
 
 <a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
 
-**RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with the Redis API.**
-
-*[What is Redis?](https://redis.io/topics/introduction)*
+**RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with the [Redis](https://redis.io/topics/introduction) API.**
 
 > RedisLess is the concatenation of Redis and Serverless.
 
