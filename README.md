@@ -95,7 +95,7 @@ redisless.stop()
 - [ ] Java
 
 # Design
-TODO
+![redisless vs redis server](assets/redisless_vs_redis_server.png)
 
 # Performance
 Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a minimum strain on your server resources (benchmarks will come soon).
