@@ -14,6 +14,7 @@ What RedisLess is:
 
 * Embedded in-memory. (No Redis server required!).
 * Compatible with the Redis API (RESP).
+* Not intrusive: you don't need to modify you code to use RedisLess!
 * Built with DX and performance in mind.
 * Cloud native friendly.
 
@@ -26,7 +27,7 @@ What RedisLess is not:
 
 To use RedisLess, you only need to:
 
-1. Install RedisLess library (see supported clients below).
+1. Install RedisLess library for your favorite language (see supported clients below).
 2. Connect your favorite Redis client to `redis://localhost:16379`.
 3. You don't need to change your code - RedisLess is Redis API compatible. (see [supported Redis commands](REDIS_FEATURES.md))
 
@@ -92,13 +93,13 @@ redisless.stop()
 - [ ] Python
 - [ ] Java
 
-# Design
+# How it works
 ![redisless vs redis server](assets/redisless_vs_redis_server.jpg)
 
 # Performance
 Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a minimum strain on your server resources (benchmarks will come soon).
 
-RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide clients for NodeJS, Python, Golang, Java, and Rust. Adding the support of another language is straightforward - supporting a new language can be done in 5 minutes. Look at [Python](clients/python) and [NodeJS](clients/nodejs) clients implementation for inspiration.
+RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide clients for NodeJS, Python, Golang, Java, and Rust. Supporting a new language can be done in 5 minutes. Look at [Python](clients/python) and [NodeJS](clients/nodejs) clients implementation for inspiration.
 
 # Contribution welcome!
 It is never too soon to contribute to a great project. If you are interested in contributing, please join us on [Discord](https://discord.qovery.com), then we can discuss. The project is in its early days, but we are serious about building a solid library to help thousands of developers.
