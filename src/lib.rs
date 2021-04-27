@@ -4,8 +4,8 @@ use std::io::{BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
-use std::{io, thread};
 
 use mpb::MPB;
 
@@ -95,6 +95,9 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
                     let _ = stream.write(format!(":{}\r\n", total_del).as_bytes());
                     return;
                 }
+                Command::Ping => {
+                    let _ = stream.write(b"+PONG\r\n");
+                }
                 Command::NotSupported(m) => {
                     let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
                     return;
@@ -127,12 +130,10 @@ pub enum ServerState {
     Error(String),
 }
 
-pub struct StateMove<T>(T, T);
-
 impl Server {
     pub fn new(redisless: RedisLess, port: u32) -> Self {
         let s = Server { bus: MPB::new() };
-        s._init_configuration(format!("127.0.0.1:{}", port), redisless);
+        s._init_configuration(format!("0.0.0.0:{}", port), redisless);
         s
     }
 
@@ -171,7 +172,7 @@ impl Server {
                                             }
                                         }
                                         Err(err) => {
-                                            state_send
+                                            let _ = state_send
                                                 .send(ServerState::Error(format!("{:?}", err)));
                                         }
                                     }
@@ -181,7 +182,7 @@ impl Server {
                                 let _ = state_send.send(ServerState::Stopped);
                             }
                             Err(err) => {
-                                state_send.send(ServerState::Error(format!("{:?}", err)));
+                                let _ = state_send.send(ServerState::Error(format!("{:?}", err)));
                             }
                         };
                     }
@@ -189,13 +190,11 @@ impl Server {
             }
         });
 
-        thread::spawn(move || {
-            // listen stop server signal
-            loop {
-                if let Ok(server_state) = stop_state_recv.recv() {
-                    if server_state == ServerState::Stop {
-                        stop_server_th2.store(true, Ordering::Relaxed);
-                    }
+        // listen stop server signal
+        thread::spawn(move || loop {
+            if let Ok(server_state) = stop_state_recv.recv() {
+                if server_state == ServerState::Stop {
+                    stop_server_th2.store(true, Ordering::Relaxed);
                 }
             }
         });
@@ -219,7 +218,7 @@ impl Server {
         });
 
         // wait for changing state
-        let rx = self.bus.rx();
+        let rx = self.bus.rx(); // TODO cache rx to reuse it?
 
         loop {
             match rx.recv_timeout(Duration::from_secs(5)) {
@@ -249,7 +248,7 @@ impl Server {
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_new() -> *mut RedisLess {
+pub extern "C" fn redisless_new() -> *const RedisLess {
     Box::into_raw(Box::new(RedisLess::new()))
 }
 
@@ -272,7 +271,23 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 mod tests {
     use redis::{Commands, RedisResult};
 
-    use crate::{RedisLess, Server, ServerState};
+    use crate::{
+        redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
+        RedisLess, Server, ServerState,
+    };
+
+    #[test]
+    fn start_and_stop_server_from_c_binding() {
+        let redisless = unsafe { std::ptr::read(redisless_new()) };
+        let server = redisless_server_new(redisless);
+
+        unsafe {
+            redisless_server_start(&*server);
+        }
+        unsafe {
+            redisless_server_stop(&*server);
+        }
+    }
 
     #[test]
     fn test_set_get_and_del() {
@@ -310,6 +325,6 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        assert_eq!(server.stop(), Some(ServerState::Stopped));
+        //assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 }
