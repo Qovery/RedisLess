@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_1() {
-        let mut mpb = MPB::new();
+        let mpb = MPB::new();
 
         let tx1 = mpb.tx();
         let tx2 = mpb.tx();

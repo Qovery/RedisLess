@@ -89,13 +89,13 @@ redis.get('foo')  # return bar
 redisless.stop()
 ```
 
-# Features
+# Planned features
 - [ ] Redis API ([see implemented features](REDIS_FEATURES.md))
 - [ ] Cluster mode
 - [ ] Auto-discovery
 - [ ] Disk persistence
 
-# Supported clients
+# Planned supported clients
 - [ ] NodeJS
 - [ ] Golang
 - [ ] Python
@@ -104,7 +104,7 @@ redisless.stop()
 # How it works
 ![redisless vs redis server](assets/redisless_vs_redis_server.jpg)
 
-# Performance
+# Expected performance
 Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a minimum strain on your server resources (benchmarks will come soon).
 
 RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide clients for NodeJS, Python, Golang, Java, and Rust. Supporting a new language can be done in 5 minutes. Look at [Python](clients/python) and [NodeJS](clients/nodejs) clients implementation for inspiration.

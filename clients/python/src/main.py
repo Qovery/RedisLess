@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import time
-
 import redis
 from clients.python.src.redisless import RedisLess
 
