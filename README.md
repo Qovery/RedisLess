@@ -1,7 +1,7 @@
 RedisLess
 ===========
 
-<a href="https://discord.qovery.com"> <img alt="Discord" src="https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square"> </a>
+[![Discord](https://img.shields.io/discord/688766934917185556?label=discord&style=flat-square)](https://discord.qovery.com) [![Test and Build](https://github.com/Qovery/RedisLess/workflows/Test%20and%20Build/badge.svg?branch=main)](https://github.com/Qovery/RedisLess/actions?query=workflow%3A%22Test+and+Build%22) [![dependency status](https://deps.rs/repo/github/Qovery/RedisLess/status.svg)](https://deps.rs/repo/github/Qovery/RedisLess)
 
 **RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with the [Redis](https://redis.io/topics/introduction) API.**
 
