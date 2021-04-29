@@ -9,9 +9,6 @@ use std::time::Duration;
 
 use mpb::MPB;
 
-#[macro_use]
-extern crate serial_test;
-
 use crate::command::Command;
 use crate::resp::{RedisProtocolParser, RESP};
 
@@ -273,6 +270,8 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 #[cfg(test)]
 mod tests {
     use redis::{Commands, RedisResult};
+    #[macro_use]
+    extern crate serial_test;
 
     use crate::{
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
