@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[macro_use]
+extern crate serial_test;
+
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::{BufReader, ErrorKind, Read, Write};
@@ -87,7 +91,7 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
                         return;
                     };
 
-                    let _ = stream.write(b"-ERR key does not exist\r\n");
+                    let _ = stream.write(b"$-1\r\n");
                     return;
                 }
                 Command::Del(k) => {
@@ -275,9 +279,6 @@ mod tests {
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
         RedisLess, Server, ServerState,
     };
-
-    #[macro_use]
-    extern crate serial_test;
 
     #[test]
     #[serial]
