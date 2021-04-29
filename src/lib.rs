@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -111,8 +111,6 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) {
         },
         _ => {}
     };
-
-    let _ = stream.write(b"+OK\r\n");
 }
 
 #[repr(C)]
@@ -157,23 +155,25 @@ impl Server {
                             Ok(listener) => {
                                 // notify that the server has been started
                                 let _ = state_send.send(ServerState::Started);
+                                let _ = listener.set_nonblocking(true);
 
                                 // listen incoming requests
                                 for stream in listener.incoming() {
+                                    if stop_server.load(Ordering::Relaxed) {
+                                        break;
+                                    }
+
                                     match stream {
                                         Ok(tcp_stream) => {
                                             while !stop_server.load(Ordering::Relaxed) {
-                                                // TODO support graceful shutdown
                                                 handle_request(redisless.borrow_mut(), &tcp_stream);
                                             }
-
-                                            if stop_server.load(Ordering::Relaxed) {
-                                                break;
-                                            }
                                         }
-                                        Err(err) => {
-                                            let _ = state_send
-                                                .send(ServerState::Error(format!("{:?}", err)));
+                                        Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                                            thread::sleep(Duration::from_millis(10));
+                                        }
+                                        Err(_) => {
+                                            break;
                                         }
                                     }
                                 }
@@ -275,8 +275,6 @@ mod tests {
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
         RedisLess, Server, ServerState,
     };
-    use std::thread;
-    use std::time::Duration;
 
     #[test]
     fn start_and_stop_server_from_c_binding() {

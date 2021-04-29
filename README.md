@@ -5,7 +5,7 @@ RedisLess
 
 ---------
 
-**THIS PROJECT IS NOT PRODUCTION READY YET!!**
+**THIS PROJECT IS NOT PRODUCTION READY AT ALL - WIP!!**
 
 ---------
 
