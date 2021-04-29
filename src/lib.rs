@@ -9,6 +9,9 @@ use std::time::Duration;
 
 use mpb::MPB;
 
+#[macro_use]
+extern crate serial_test;
+
 use crate::command::Command;
 use crate::resp::{RedisProtocolParser, RESP};
 
@@ -277,6 +280,7 @@ mod tests {
     };
 
     #[test]
+    #[serial]
     fn start_and_stop_server_from_c_binding() {
         let redisless = unsafe { std::ptr::read(redisless_new()) };
         let server = redisless_server_new(redisless);
@@ -300,6 +304,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_redis_implementation() {
         let server = Server::new(RedisLess::new(), 16379);
 

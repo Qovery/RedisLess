@@ -15,3 +15,4 @@ mpb = { path = "mpb" }
 
 [dev-dependencies]
 redis = "0.20.0"
+serial_test = "0.5.1"
