@@ -270,13 +270,14 @@ pub extern "C" fn redisless_server_stop(server: &Server) {
 #[cfg(test)]
 mod tests {
     use redis::{Commands, RedisResult};
-    #[macro_use]
-    extern crate serial_test;
 
     use crate::{
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
         RedisLess, Server, ServerState,
     };
+
+    #[macro_use]
+    extern crate serial_test;
 
     #[test]
     #[serial]
