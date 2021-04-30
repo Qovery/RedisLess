@@ -1,19 +1,21 @@
-from cffi import FFI
 from os.path import dirname, abspath
+
+from cffi import FFI
+
 
 class RedisLess(object):
     """
     RedisLess
     """
 
-    def __init__(self):
+    def __init__(self, port: int = 16379):
         ffi = FFI()
         ffi.cdef("""
             typedef void* redisless;
             typedef void* server;
             
             redisless redisless_new();
-            server redisless_server_new(redisless);
+            server redisless_server_new(redisless, unsigned short);
             void redisless_server_start(server);
             void redisless_server_stop(server);
         """)
@@ -22,7 +24,7 @@ class RedisLess(object):
         source_path = dirname(abspath(__file__))
         self._C = ffi.dlopen("{}/libredisless.dylib".format(source_path))
         self._redisless = self._C.redisless_new()
-        self._redisless_server = self._C.redisless_server_new(self._redisless)
+        self._redisless_server = self._C.redisless_server_new(self._redisless, port)
 
     def start(self):
         """

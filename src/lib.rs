@@ -193,7 +193,7 @@ pub enum ServerState {
 }
 
 impl Server {
-    pub fn new(redisless: RedisLess, port: u32) -> Self {
+    pub fn new(redisless: RedisLess, port: u16) -> Self {
         let s = Server {
             server_state_bus: MPB::new(),
         };
@@ -344,8 +344,8 @@ pub extern "C" fn redisless_new() -> *const RedisLess {
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_server_new(redisless: RedisLess) -> *const Server {
-    Box::into_raw(Box::new(Server::new(redisless, 16379)))
+pub extern "C" fn redisless_server_new(redisless: RedisLess, port: u16) -> *const Server {
+    Box::into_raw(Box::new(Server::new(redisless, port)))
 }
 
 #[no_mangle]
@@ -369,15 +369,29 @@ mod tests {
         redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
         RedisLess, Server, ServerState,
     };
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
 
     #[test]
     #[serial]
     fn start_and_stop_server_from_c_binding() {
         let redisless = unsafe { std::ptr::read(redisless_new()) };
-        let server = redisless_server_new(redisless);
+        let port = 4444;
+        let server = redisless_server_new(redisless, port);
 
         unsafe {
             redisless_server_start(&*server);
+        }
+
+        let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();
+
+        for _ in 0..29 {
+            let _ = stream.write(b"*1\r\n$4\r\nPING\r\n");
+
+            let mut pong_res = [0; 7];
+            let _ = stream.read(&mut pong_res);
+
+            assert_eq!(pong_res, b"+PONG\r\n"[..]);
         }
 
         unsafe {
@@ -398,11 +412,12 @@ mod tests {
     #[test]
     #[serial]
     fn test_redis_implementation() {
-        let server = Server::new(RedisLess::new(), 16379);
+        let port = 16379;
+        let server = Server::new(RedisLess::new(), port);
 
         assert_eq!(server.start(), Some(ServerState::Started));
 
-        let redis_client = redis::Client::open("redis://127.0.0.1:16379/").unwrap();
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
         let _: () = con.set("key", "value").unwrap();
@@ -431,7 +446,7 @@ mod tests {
         let server = Server::new(RedisLess::new(), 3333);
         assert_eq!(server.start(), Some(ServerState::Started));
 
-        //thread::sleep(Duration::from_secs(3600));
+        // thread::sleep(Duration::from_secs(3600));
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
