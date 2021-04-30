@@ -12,6 +12,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 mpb = { path = "mpb" }
+crossbeam-channel = "0.5.1"
 
 [dev-dependencies]
 redis = "0.20.0"

@@ -26,6 +26,10 @@ impl Command {
         match v.first() {
             Some(RESP::BulkString(op)) => match *op {
                 b"SET" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'SET' command");
+                    }
+
                     if let Some(arg1) = get_bytes_vec(v.get(1)) {
                         if let Some(arg2) = get_bytes_vec(v.get(2)) {
                             return Command::Set(arg1, arg2);
@@ -35,6 +39,10 @@ impl Command {
                     Error("wrong number of arguments for 'SET' command")
                 }
                 b"GET" => {
+                    if v.len() != 2 {
+                        return Error("wrong number of arguments for 'GET' command");
+                    }
+
                     if let Some(arg1) = get_bytes_vec(v.get(1)) {
                         return Command::Get(arg1);
                     }
@@ -42,6 +50,10 @@ impl Command {
                     Error("wrong number of arguments for 'GET' command")
                 }
                 b"DEL" => {
+                    if v.len() != 2 {
+                        return Error("wrong number of arguments for 'DEL' command");
+                    }
+
                     if let Some(arg1) = get_bytes_vec(v.get(1)) {
                         return Command::Del(arg1);
                     }
