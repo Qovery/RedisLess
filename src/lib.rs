@@ -79,6 +79,7 @@ fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>)
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
+type CommandResponse = Vec<u8>;
 
 fn unlock(redisless: &Arc<Mutex<RedisLess>>) -> MutexGuard<RedisLess> {
     loop {
@@ -93,10 +94,7 @@ fn unlock(redisless: &Arc<Mutex<RedisLess>>) -> MutexGuard<RedisLess> {
     }
 }
 
-fn handle_request(
-    redisless: &Arc<Mutex<RedisLess>>,
-    mut stream: &TcpStream,
-) -> (CloseConnection, ReceivedDataLength) {
+fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
     let mut buf_reader = BufReader::new(stream);
     let mut buf = [0; 512];
     let mut buf_length = 0 as usize;
@@ -109,6 +107,59 @@ fn handle_request(
         }
     }
 
+    (buf, buf_length)
+}
+
+fn get_command(bytes: &[u8; 512]) -> Option<Command> {
+    match RedisProtocolParser::parse(bytes) {
+        Ok((resp, _)) => match resp {
+            RESP::Array(x) => Some(Command::parse(x)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn run_command_and_get_response(
+    redisless: &Arc<Mutex<RedisLess>>,
+    bytes: &[u8; 512],
+) -> (Option<Command>, CommandResponse) {
+    let command = get_command(bytes);
+
+    let response = match &command {
+        Some(command) => match command {
+            Command::Set(k, v) => {
+                unlock(redisless).set(k.as_slice(), v.as_slice());
+                b"+OK\r\n".to_vec()
+            }
+            Command::Get(k) => match unlock(redisless).get(k.as_slice()) {
+                Some(value) => {
+                    let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                    res.as_bytes().to_vec()
+                }
+                None => b"$-1\r\n".to_vec(),
+            },
+            Command::Del(k) => {
+                let total_del = unlock(redisless).del(k.as_slice());
+                format!(":{}\r\n", total_del).as_bytes().to_vec()
+            }
+            Command::Ping => b"+PONG\r\n".to_vec(),
+            Command::Quit => b"+OK\r\n".to_vec(),
+            Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+            Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+        },
+        None => b"-ERR command not found\r\n".to_vec(),
+    };
+
+    (command, response)
+}
+
+fn handle_request(
+    redisless: &Arc<Mutex<RedisLess>>,
+    mut stream: &TcpStream,
+) -> (CloseConnection, ReceivedDataLength) {
+    let (buf, buf_length) = get_bytes_from_request(stream);
+
     match buf.get(0) {
         Some(x) if *x == 0 => {
             return (false, buf_length);
@@ -116,47 +167,14 @@ fn handle_request(
         _ => {}
     }
 
-    match RedisProtocolParser::parse(&buf) {
-        Ok((resp, _)) => match resp {
-            RESP::Array(x) => match Command::parse(x) {
-                Command::Set(k, v) => {
-                    unlock(redisless).set(k.as_slice(), v.as_slice());
-                    let _ = stream.write(b"+OK\r\n");
-                }
-                Command::Get(k) => {
-                    if let Some(value) = unlock(redisless).get(k.as_slice()) {
-                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                        let _ = stream.write(res.as_bytes());
-                        return (false, buf_length);
-                    };
+    let (command, res) = run_command_and_get_response(redisless, &buf);
 
-                    let _ = stream.write(b"$-1\r\n");
-                }
-                Command::Del(k) => {
-                    let total_del = unlock(redisless).del(k.as_slice());
-                    let res = format!(":{}\r\n", total_del);
-                    let _ = stream.write(res.as_bytes());
-                }
-                Command::Ping => {
-                    let _ = stream.write(b"+PONG\r\n");
-                }
-                Command::Quit => {
-                    let _ = stream.write(b"+OK\r\n");
-                    return (true, buf_length);
-                }
-                Command::NotSupported(m) => {
-                    let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
-                }
-                Command::Error(m) => {
-                    let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
-                }
-            },
-            _ => {}
-        },
-        _ => {}
-    };
+    let _ = stream.write(res.as_slice());
 
-    (false, buf_length)
+    match command {
+        Some(command) if command == Command::Quit => (true, buf_length),
+        _ => (false, buf_length),
+    }
 }
 
 #[repr(C)]

@@ -5,6 +5,7 @@ type Key = Vec<u8>;
 type Value = Vec<u8>;
 type Message = &'static str;
 
+#[derive(PartialEq)]
 pub enum Command {
     Set(Key, Value),
     Get(Key),
