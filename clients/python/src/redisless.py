@@ -1,5 +1,5 @@
 from cffi import FFI
-
+from os.path import dirname, abspath
 
 class RedisLess(object):
     """
@@ -18,7 +18,9 @@ class RedisLess(object):
             void redisless_server_stop(server);
         """)
 
-        self._C = ffi.dlopen('../../../target/release/libredisless.dylib')
+        # TODO support Windows / Linux and MacOSX - load the right lib
+        source_path = dirname(abspath(__file__))
+        self._C = ffi.dlopen("{}/libredisless.dylib".format(source_path))
         self._redisless = self._C.redisless_new()
         self._redisless_server = self._C.redisless_server_new(self._redisless)
 

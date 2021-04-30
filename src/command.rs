@@ -10,6 +10,7 @@ pub enum Command {
     Get(Key),
     Del(Key),
     Ping,
+    Quit,
     Error(Message),
     NotSupported(String),
 }
@@ -61,6 +62,7 @@ impl Command {
                     Error("wrong number of arguments for 'DEL' command")
                 }
                 b"PING" => Command::Ping,
+                b"QUIT" => Command::Quit,
                 cmd => NotSupported(format!(
                     "Command '{}' is not supported",
                     std::str::from_utf8(cmd).unwrap()

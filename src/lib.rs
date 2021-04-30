@@ -2,20 +2,19 @@
 #[macro_use]
 extern crate serial_test;
 
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::Duration;
+
+use crossbeam_channel::{Receiver, Sender};
 
 use mpb::MPB;
 
 use crate::command::Command;
 use crate::resp::{RedisProtocolParser, RESP};
-use crossbeam_channel::{Receiver, Sender};
 
 mod command;
 mod resp;
@@ -78,9 +77,22 @@ fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>)
     false
 }
 
-type EOF = bool;
+type CloseConnection = bool;
 
-fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) -> EOF {
+fn unlock(redisless: &Arc<Mutex<RedisLess>>) -> MutexGuard<RedisLess> {
+    loop {
+        match redisless.lock() {
+            Ok(redisless) => {
+                return redisless;
+            }
+            Err(_) => {
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
+}
+
+fn handle_request(redisless: &Arc<Mutex<RedisLess>>, mut stream: &TcpStream) -> CloseConnection {
     let mut buf_reader = BufReader::new(stream);
     let mut buf = [0; 512];
 
@@ -92,7 +104,7 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) -> EOF {
 
     match buf.get(0) {
         Some(x) if *x == 0 => {
-            return true;
+            return false;
         }
         _ => {}
     }
@@ -101,11 +113,11 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) -> EOF {
         Ok((resp, _)) => match resp {
             RESP::Array(x) => match Command::parse(x) {
                 Command::Set(k, v) => {
-                    redisless.set(k.as_slice(), v.as_slice());
+                    unlock(redisless).set(k.as_slice(), v.as_slice());
                     let _ = stream.write(b"+OK\r\n");
                 }
                 Command::Get(k) => {
-                    if let Some(value) = redisless.get(k.as_slice()) {
+                    if let Some(value) = unlock(redisless).get(k.as_slice()) {
                         let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                         let _ = stream.write(res.as_bytes());
                         return false;
@@ -114,12 +126,16 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) -> EOF {
                     let _ = stream.write(b"$-1\r\n");
                 }
                 Command::Del(k) => {
-                    let total_del = redisless.del(k.as_slice());
+                    let total_del = unlock(redisless).del(k.as_slice());
                     let res = format!(":{}\r\n", total_del);
                     let _ = stream.write(res.as_bytes());
                 }
                 Command::Ping => {
                     let _ = stream.write(b"+PONG\r\n");
+                }
+                Command::Quit => {
+                    let _ = stream.write(b"+OK\r\n");
+                    return true;
                 }
                 Command::NotSupported(m) => {
                     let _ = stream.write(format!("-ERR {}\r\n", m).as_bytes());
@@ -138,7 +154,7 @@ fn handle_request(redisless: &mut RedisLess, mut stream: &TcpStream) -> EOF {
 
 #[repr(C)]
 pub struct Server {
-    bus: MPB<ServerState>,
+    server_state_bus: MPB<ServerState>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -153,19 +169,22 @@ pub enum ServerState {
 
 impl Server {
     pub fn new(redisless: RedisLess, port: u32) -> Self {
-        let s = Server { bus: MPB::new() };
+        let s = Server {
+            server_state_bus: MPB::new(),
+        };
+
         s._init_configuration(format!("0.0.0.0:{}", port), redisless);
         s
     }
 
     fn _init_configuration<A: Into<String>>(&self, addr: A, redisless: RedisLess) {
         let addr = addr.into();
-        let state_send = self.bus.tx();
-        let state_recv = self.bus.rx();
+        let state_send = self.server_state_bus.tx();
+        let state_recv = self.server_state_bus.rx();
 
-        thread::spawn(move || {
+        let _ = thread::spawn(move || {
             let addr = addr;
-            let mut redisless = redisless;
+            let redisless = Arc::new(Mutex::new(redisless));
 
             loop {
                 if let Ok(server_state) = state_recv.recv() {
@@ -175,20 +194,32 @@ impl Server {
                                 // notify that the server has been started
                                 let _ = state_send.send(ServerState::Started);
                                 let _ = listener.set_nonblocking(true);
+                                let _ = listener.set_ttl(60);
 
                                 // listen incoming requests
                                 for stream in listener.incoming() {
                                     match stream {
-                                        Ok(tcp_stream) => loop {
-                                            while !handle_request(
-                                                redisless.borrow_mut(),
-                                                &tcp_stream,
-                                            ) {}
+                                        Ok(tcp_stream) => {
+                                            let redisless = redisless.clone();
+                                            let state_recv = state_recv.clone();
+                                            let state_send = state_send.clone();
 
-                                            if stop_sig_received(&state_recv, &state_send) {
-                                                return;
-                                            }
-                                        },
+                                            let _ = thread::spawn(move || {
+                                                loop {
+                                                    let close_connection =
+                                                        handle_request(&redisless, &tcp_stream);
+
+                                                    if stop_sig_received(&state_recv, &state_send) {
+                                                        // then we can gracefully shutdown the server
+                                                        return;
+                                                    }
+
+                                                    if close_connection {
+                                                        break;
+                                                    }
+                                                }
+                                            });
+                                        }
                                         Err(err) if err.kind() == ErrorKind::WouldBlock => {
                                             thread::sleep(Duration::from_millis(10));
                                         }
@@ -213,7 +244,7 @@ impl Server {
     }
 
     fn change_state(&self, change_to: ServerState) -> Option<ServerState> {
-        let send_state_ch = self.bus.tx();
+        let send_state_ch = self.server_state_bus.tx();
 
         let post_change_to_state = match change_to {
             ServerState::Start => ServerState::Started,
@@ -230,7 +261,7 @@ impl Server {
         });
 
         // wait for changing state
-        let rx = self.bus.rx(); // TODO cache rx to reuse it?
+        let rx = self.server_state_bus.rx(); // TODO cache rx to reuse it?
 
         loop {
             match rx.recv_timeout(Duration::from_secs(10)) {
@@ -351,6 +382,9 @@ mod tests {
     fn start_and_stop_server() {
         let server = Server::new(RedisLess::new(), 3333);
         assert_eq!(server.start(), Some(ServerState::Started));
+
+        // thread::sleep(Duration::from_secs(3600));
+
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 }
