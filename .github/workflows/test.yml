@@ -56,5 +56,3 @@ jobs:
       - name: Check code style
         run: cargo fmt -- --check
 
-      - name: Run integration tests
-        run: tests/integration/scripts/run.sh
