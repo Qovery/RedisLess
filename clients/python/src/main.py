@@ -10,16 +10,16 @@ if __name__ == '__main__':
     assert redisless.start()
 
     redis = redis.Redis(host='127.0.0.1', port=port)
-    # redis = redis.Redis(host='127.0.0.1', port=3333)
 
-    assert redis.ping()
+    for _ in range(20):
+        assert redis.ping()
 
-    redis.set('key', 'value')
-    assert redis.get('key') == b'value'
+        redis.set('key', 'value')
+        assert redis.get('key') == b'value'
 
-    assert redis.get('key2') is None
-    assert redis.get('not existing key') is None
+        assert redis.get('key2') is None
+        assert redis.get('not existing key') is None
 
-    assert redis.delete('key') == 1
+        assert redis.delete('key') == 1
 
     assert redisless.stop()
