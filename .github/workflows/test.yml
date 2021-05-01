@@ -47,12 +47,15 @@ jobs:
             tests/integration/runner/node_modules
           key: ${{ runner.os }}-integration-${{ matrix.rust-toolchain }}
 
-      - name: Build code
-        run: cargo build
+      - name: Build RedisLess
+        run: cd redisless && cargo build
 
-      - name: Test code
-        run: cargo test
+      - name: Test RedisLess
+        run: cd redisless && cargo test
 
-      - name: Check code style
-        run: cargo fmt -- --check
+      - name: Bench RedisLess
+        run: cd redisless && cargo bench
+
+      - name: Check RedisLess code style
+        run: cd redisless && cargo fmt -- --check
 
