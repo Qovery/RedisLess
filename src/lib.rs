@@ -236,6 +236,7 @@ impl Server {
                                                     if received_data_length > 0 {
                                                         // reset the last time we received data
                                                         last_update = SystemTime::now();
+                                                    } else {
                                                         // delay the loop
                                                         thread::sleep(Duration::from_millis(10));
                                                     }
@@ -275,12 +276,12 @@ impl Server {
 
                                     if stop_sig_received(&state_recv, &state_send) {
                                         // let's gracefully shutdown the server
-                                        return;
+                                        break;
                                     }
                                 }
                             }
-                            Err(err) => {
-                                let _ = state_send.send(ServerState::Error(format!("{:?}", err)));
+                            Err(_) => {
+                                thread::sleep(Duration::from_millis(10));
                             }
                         };
                     }
@@ -310,7 +311,7 @@ impl Server {
         let rx = self.server_state_bus.rx(); // TODO cache rx to reuse it?
 
         loop {
-            match rx.recv_timeout(Duration::from_secs(10)) {
+            match rx.recv_timeout(Duration::from_secs(5)) {
                 Ok(server_state) => {
                     if server_state == post_change_to_state {
                         return Some(server_state);
@@ -474,5 +475,15 @@ mod tests {
         // thread::sleep(Duration::from_secs(3600));
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
+    }
+
+    #[test]
+    fn start_and_stop_server_multiple_times() {
+        let server = Server::new(RedisLess::new(), 3334);
+
+        for _ in 0..9 {
+            assert_eq!(server.start(), Some(ServerState::Started));
+            assert_eq!(server.stop(), Some(ServerState::Stopped));
+        }
     }
 }
