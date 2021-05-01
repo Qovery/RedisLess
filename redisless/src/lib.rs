@@ -142,6 +142,7 @@ fn run_command_and_get_response(
                 let total_del = unlock(redisless).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
+            Command::Info => b"$0\r\n\r\n".to_vec(), // TODO change with some real info?
             Command::Ping => b"+PONG\r\n".to_vec(),
             Command::Quit => b"+OK\r\n".to_vec(),
             Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),

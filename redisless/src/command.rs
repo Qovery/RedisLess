@@ -10,6 +10,7 @@ pub enum Command {
     Set(Key, Value),
     Get(Key),
     Del(Key),
+    Info,
     Ping,
     Quit,
     Error(Message),
@@ -62,6 +63,7 @@ impl Command {
 
                     Error("wrong number of arguments for 'DEL' command")
                 }
+                b"INFO" => Command::Info,
                 b"PING" => Command::Ping,
                 b"QUIT" => Command::Quit,
                 cmd => NotSupported(format!(
