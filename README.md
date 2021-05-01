@@ -84,6 +84,7 @@ redis = redis.Redis(host='localhost', port=16379, db=0)
 
 redis.set('foo', 'bar')
 redis.get('foo')  # return bar 
+redis.delete('foo')  # return 1 
 
 # stop RedisLess embedded instance
 redisless.stop()

@@ -1,4 +1,5 @@
 from os.path import dirname, abspath
+from sys import platform
 
 from cffi import FFI
 
@@ -13,14 +14,11 @@ class RedisLess(object):
         ffi = FFI()
 
         c_def = """
-            // opaque pointer to RedisLess struct
-            typedef void* redisless;
             // opaque pointer to Server struct
             typedef void* server;
             
-            redisless redisless_new();
-            server redisless_server_new(redisless, unsigned short);
-            void redisless_server_free(void* redisless);
+            server redisless_server_new(unsigned short);
+            void redisless_server_free(void* server);
             bool redisless_server_start(void* server);
             bool redisless_server_stop(void* server);
         """
@@ -30,11 +28,21 @@ class RedisLess(object):
 
         ffi.cdef(c_def)
 
-        # TODO support Windows / Linux and MacOSX - load the right lib
+        # support Windows / Linux and MacOSX - load the right lib
+        lib_extension = None
+        if platform.startswith('linux'):
+            lib_extension = 'so'
+        elif platform.startswith('darwin'):
+            lib_extension = 'dylib'
+        elif platform.startswith('win32'):
+            lib_extension = 'dll'
+        else:
+            print('platform {} not supported'.format(platform))
+            exit(1)
+
         source_path = dirname(abspath(__file__))
-        self._C = ffi.dlopen("{}/libredisless.dylib".format(source_path))
-        self._redisless = self._C.redisless_new()
-        self._redisless_server = self._C.redisless_server_new(self._redisless, port)
+        self._C = ffi.dlopen("{}/libredisless.{}".format(source_path, lib_extension))
+        self._redisless_server = self._C.redisless_server_new(port)
 
     # TODO implement destructor and free redisless
 

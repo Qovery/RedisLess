@@ -3,7 +3,7 @@
 extern crate serial_test;
 
 use std::collections::HashMap;
-use std::io::{BufReader, ErrorKind, Read, Write};
+use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
@@ -338,18 +338,8 @@ impl Server {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn redisless_new() -> *mut RedisLess {
-    Box::into_raw(Box::new(RedisLess::new()))
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn redisless_free(redisless: *mut RedisLess) {
-    Box::from_raw(redisless);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn redisless_server_new(redisless: RedisLess, port: u16) -> *mut Server {
-    Box::into_raw(Box::new(Server::new(redisless, port)))
+pub unsafe extern "C" fn redisless_server_new(port: u16) -> *mut Server {
+    Box::into_raw(Box::new(Server::new(RedisLess::new(), port)))
 }
 
 #[no_mangle]
@@ -393,16 +383,15 @@ mod tests {
     use redis::{Commands, RedisResult};
 
     use crate::{
-        redisless_free, redisless_new, redisless_server_free, redisless_server_new,
-        redisless_server_start, redisless_server_stop, RedisLess, Server, ServerState,
+        redisless_server_free, redisless_server_new, redisless_server_start, redisless_server_stop,
+        RedisLess, Server, ServerState,
     };
 
     #[test]
     #[serial]
     fn start_and_stop_server_from_c_binding() {
-        let redisless = unsafe { std::ptr::read(redisless_new()) };
         let port = 4444 as u16;
-        let server = unsafe { redisless_server_new(redisless, port) };
+        let server = unsafe { redisless_server_new(port) };
 
         unsafe {
             assert!(redisless_server_start(server), "server didn't start");
@@ -411,12 +400,29 @@ mod tests {
         let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();
 
         for _ in 0..29 {
+            // run command `PING`
             let _ = stream.write(b"*1\r\n$4\r\nPING\r\n");
-
             let mut pong_res = [0; 7];
             let _ = stream.read(&mut pong_res);
-
             assert_eq!(pong_res, b"+PONG\r\n"[..]);
+
+            // run command `SET mykey value`
+            let _ = stream.write(b"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$5\r\nvalue\r\n");
+            let mut set_res = [0; 5];
+            let _ = stream.read(&mut set_res);
+            assert_eq!(set_res, b"+OK\r\n"[..]);
+
+            // run command `GET mykey`
+            let _ = stream.write(b"*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n");
+            let mut get_res = [0; 8];
+            let _ = stream.read(&mut get_res);
+            assert_eq!(get_res, b"+value\r\n"[..]);
+
+            // run command `DEL mykey`
+            let _ = stream.write(b"*2\r\n$3\r\nDEL\r\n$5\r\nmykey\r\n");
+            let mut del_res = [0; 4];
+            let _ = stream.read(&mut del_res);
+            assert_eq!(del_res, b":1\r\n"[..]);
         }
 
         unsafe {
