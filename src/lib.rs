@@ -19,7 +19,6 @@ use crate::resp::{RedisProtocolParser, RESP};
 mod command;
 mod resp;
 
-#[repr(C)]
 pub struct RedisLess {
     data_mapper: HashMap<Vec<u8>, DataType>,
     string_store: HashMap<Vec<u8>, Vec<u8>>,
@@ -177,7 +176,6 @@ fn handle_request(
     }
 }
 
-#[repr(C)]
 pub struct Server {
     server_state_bus: MPB<ServerState>,
 }
@@ -339,48 +337,74 @@ impl Server {
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_new() -> *const RedisLess {
+pub unsafe extern "C" fn redisless_new() -> *mut RedisLess {
     Box::into_raw(Box::new(RedisLess::new()))
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_server_new(redisless: RedisLess, port: u16) -> *const Server {
+pub unsafe extern "C" fn redisless_free(redisless: *mut RedisLess) {
+    Box::from_raw(redisless);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redisless_server_new(redisless: RedisLess, port: u16) -> *mut Server {
     Box::into_raw(Box::new(Server::new(redisless, port)))
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_server_start(server: &Server) {
-    server.start();
+pub unsafe extern "C" fn redisless_server_free(server: *mut Server) {
+    let _ = Box::from_raw(server);
 }
 
 #[no_mangle]
-pub extern "C" fn redisless_server_stop(server: &Server) {
-    server.stop();
+pub unsafe extern "C" fn redisless_server_start(server: *mut Server) -> bool {
+    let server = match server.as_ref() {
+        Some(server) => server,
+        None => return false,
+    };
+
+    match server.start() {
+        Some(server_state) => server_state == ServerState::Started,
+        None => false,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn redisless_server_stop(server: *mut Server) -> bool {
+    let server = match server.as_ref() {
+        Some(server) => server,
+        None => return false,
+    };
+
+    match server.stop() {
+        Some(server_state) => server_state == ServerState::Stopped,
+        None => false,
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
     use std::thread;
     use std::time::Duration;
 
     use redis::{Commands, RedisResult};
 
     use crate::{
-        redisless_new, redisless_server_new, redisless_server_start, redisless_server_stop,
-        RedisLess, Server, ServerState,
+        redisless_free, redisless_new, redisless_server_free, redisless_server_new,
+        redisless_server_start, redisless_server_stop, RedisLess, Server, ServerState,
     };
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
 
     #[test]
     #[serial]
     fn start_and_stop_server_from_c_binding() {
         let redisless = unsafe { std::ptr::read(redisless_new()) };
-        let port = 4444;
-        let server = redisless_server_new(redisless, port);
+        let port = 4444 as u16;
+        let server = unsafe { redisless_server_new(redisless, port) };
 
         unsafe {
-            redisless_server_start(&*server);
+            assert!(redisless_server_start(server), "server didn't start");
         }
 
         let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();
@@ -395,7 +419,8 @@ mod tests {
         }
 
         unsafe {
-            redisless_server_stop(&*server);
+            assert!(redisless_server_stop(server), "server didn't stop");
+            redisless_server_free(server);
         }
     }
 

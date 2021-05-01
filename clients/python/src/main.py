@@ -7,7 +7,7 @@ if __name__ == '__main__':
     port = 16379
 
     redisless = RedisLess(port=port)
-    redisless.start()
+    assert redisless.start()
 
     redis = redis.Redis(host='127.0.0.1', port=port, db=0)
     # redis = redis.Redis(host='127.0.0.1', port=3333, db=0)
@@ -22,4 +22,4 @@ if __name__ == '__main__':
     redis.delete('key')
     redis.close()
 
-    redisless.stop()
+    assert redisless.stop()
