@@ -176,6 +176,84 @@ fn handle_request(
     }
 }
 
+fn start_server(
+    addr: &String,
+    state_send: &Sender<ServerState>,
+    state_recv: &Receiver<ServerState>,
+    redisless: &Arc<Mutex<RedisLess>>,
+) {
+    let listener = match TcpListener::bind(addr) {
+        Ok(listener) => {
+            // notify that the server has been started
+            let _ = state_send.send(ServerState::Started);
+            let _ = listener.set_nonblocking(true);
+            listener
+        }
+        Err(_) => {
+            thread::sleep(Duration::from_millis(10));
+            return;
+        }
+    };
+
+    // listen incoming requests
+    for stream in listener.incoming() {
+        match stream {
+            Ok(tcp_stream) => {
+                let redisless = redisless.clone();
+                let state_recv = state_recv.clone();
+                let state_send = state_send.clone();
+
+                let _ = thread::spawn(move || {
+                    let mut last_update = SystemTime::now();
+
+                    loop {
+                        let (close_connection, received_data_length) =
+                            handle_request(&redisless, &tcp_stream);
+
+                        if received_data_length > 0 {
+                            // reset the last time we received data
+                            last_update = SystemTime::now();
+                        } else {
+                            // delay the loop
+                            thread::sleep(Duration::from_millis(10));
+                        }
+
+                        if stop_sig_received(&state_recv, &state_send) || close_connection {
+                            // let's close the connection
+                            return;
+                        }
+
+                        match last_update.duration_since(SystemTime::now()) {
+                            Ok(duration) => {
+                                if duration.as_secs() >= 300 {
+                                    // close the connection after 300 secs of inactivity
+                                    return;
+                                }
+                            }
+                            Err(_) => {}
+                        }
+
+                        if close_connection {
+                            return;
+                        }
+                    }
+                });
+            }
+            Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => {
+                break;
+            }
+        }
+
+        if stop_sig_received(&state_recv, &state_send) {
+            // let's gracefully shutdown the server
+            break;
+        }
+    }
+}
+
 pub struct Server {
     server_state_bus: MPB<ServerState>,
 }
@@ -212,78 +290,7 @@ impl Server {
             loop {
                 if let Ok(server_state) = state_recv.recv() {
                     if server_state == ServerState::Start {
-                        match TcpListener::bind(addr.as_str()) {
-                            Ok(listener) => {
-                                // notify that the server has been started
-                                let _ = state_send.send(ServerState::Started);
-                                let _ = listener.set_nonblocking(true);
-
-                                // listen incoming requests
-                                for stream in listener.incoming() {
-                                    match stream {
-                                        Ok(tcp_stream) => {
-                                            let redisless = redisless.clone();
-                                            let state_recv = state_recv.clone();
-                                            let state_send = state_send.clone();
-
-                                            let _ = thread::spawn(move || {
-                                                let mut last_update = SystemTime::now();
-
-                                                loop {
-                                                    let (close_connection, received_data_length) =
-                                                        handle_request(&redisless, &tcp_stream);
-
-                                                    if received_data_length > 0 {
-                                                        // reset the last time we received data
-                                                        last_update = SystemTime::now();
-                                                    } else {
-                                                        // delay the loop
-                                                        thread::sleep(Duration::from_millis(10));
-                                                    }
-
-                                                    if stop_sig_received(&state_recv, &state_send)
-                                                        || close_connection
-                                                    {
-                                                        // let's close the connection
-                                                        return;
-                                                    }
-
-                                                    match last_update
-                                                        .duration_since(SystemTime::now())
-                                                    {
-                                                        Ok(duration) => {
-                                                            if duration.as_secs() >= 300 {
-                                                                // close the connection after 300 secs of inactivity
-                                                                return;
-                                                            }
-                                                        }
-                                                        Err(_) => {}
-                                                    }
-
-                                                    if close_connection {
-                                                        return;
-                                                    }
-                                                }
-                                            });
-                                        }
-                                        Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                                            thread::sleep(Duration::from_millis(10));
-                                        }
-                                        Err(_) => {
-                                            break;
-                                        }
-                                    }
-
-                                    if stop_sig_received(&state_recv, &state_send) {
-                                        // let's gracefully shutdown the server
-                                        break;
-                                    }
-                                }
-                            }
-                            Err(_) => {
-                                thread::sleep(Duration::from_millis(10));
-                            }
-                        };
+                        start_server(&addr, &state_send, &state_recv, &redisless);
                     }
                 }
             }
