@@ -3,17 +3,24 @@ name = "redisless"
 version = "0.1.0"
 authors = ["Romaric Philogene <evoxmusic@gmail.com>"]
 edition = "2018"
+keywords = ["redis", "embedded"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 name = "redisless"
-crate-type = ["cdylib"]
+crate-type = ["rlib", "dylib"]
 
 [dependencies]
 mpb = { path = "mpb" }
 crossbeam-channel = "0.5.1"
 
 [dev-dependencies]
-redis = "0.20.0"
-serial_test = "0.5.1"
+redis = "0.20"
+serial_test = "0.5"
+criterion = "0.3"
+
+[[bench]]
+name = "benchmarks"
+harness = false

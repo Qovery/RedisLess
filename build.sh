@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
 
-cargo build --release
-cp target/release/libredisless.dylib clients/python/src/libredisless.dylib
+cd redisless && cargo build --release && cd ..
+
+cp redisless/target/release/libredisless.dylib clients/python/src/libredisless.dylib
+cp redisless/target/release/libredisless.dylib clients/nodejs/src/libredisless.dylib

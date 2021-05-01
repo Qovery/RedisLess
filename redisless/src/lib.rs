@@ -3,7 +3,7 @@
 extern crate serial_test;
 
 use std::collections::HashMap;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
@@ -377,8 +377,6 @@ pub unsafe extern "C" fn redisless_server_stop(server: *mut Server) -> bool {
 mod tests {
     use std::io::{Read, Write};
     use std::net::TcpStream;
-    use std::thread;
-    use std::time::Duration;
 
     use redis::{Commands, RedisResult};
 
@@ -477,9 +475,6 @@ mod tests {
     fn start_and_stop_server() {
         let server = Server::new(RedisLess::new(), 3333);
         assert_eq!(server.start(), Some(ServerState::Started));
-
-        // thread::sleep(Duration::from_secs(3600));
-
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
