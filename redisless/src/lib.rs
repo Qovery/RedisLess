@@ -2,7 +2,6 @@
 #[macro_use]
 extern crate serial_test;
 
-use std::collections::HashMap;
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -11,7 +10,6 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
-use redis::Commands;
 
 use storage::in_memory::InMemoryStorage;
 use storage::Storage;
