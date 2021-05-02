@@ -1,5 +1,5 @@
 use crate::command::Command::{Error, NotSupported};
-use crate::resp::RESP;
+use crate::protocol::RESP;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -28,7 +28,7 @@ impl Command {
     pub fn parse(v: Vec<RESP>) -> Self {
         match v.first() {
             Some(RESP::BulkString(op)) => match *op {
-                b"SET" => {
+                b"SET" | b"set" | b"Set" => {
                     if v.len() != 3 {
                         return Error("wrong number of arguments for 'SET' command");
                     }
@@ -41,7 +41,7 @@ impl Command {
 
                     Error("wrong number of arguments for 'SET' command")
                 }
-                b"GET" => {
+                b"GET" | b"get" | b"Get" => {
                     if v.len() != 2 {
                         return Error("wrong number of arguments for 'GET' command");
                     }
@@ -52,7 +52,7 @@ impl Command {
 
                     Error("wrong number of arguments for 'GET' command")
                 }
-                b"DEL" => {
+                b"DEL" | b"del" | b"Del" => {
                     if v.len() != 2 {
                         return Error("wrong number of arguments for 'DEL' command");
                     }
@@ -63,9 +63,9 @@ impl Command {
 
                     Error("wrong number of arguments for 'DEL' command")
                 }
-                b"INFO" => Command::Info,
-                b"PING" => Command::Ping,
-                b"QUIT" => Command::Quit,
+                b"INFO" | b"info" | b"Info" => Command::Info,
+                b"PING" | b"ping" | b"Ping" => Command::Ping,
+                b"QUIT" | b"quit" | b"Quit" => Command::Quit,
                 cmd => NotSupported(format!(
                     "Command '{}' is not supported",
                     std::str::from_utf8(cmd).unwrap()

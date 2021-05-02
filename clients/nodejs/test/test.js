@@ -1,19 +1,23 @@
-const {RedisLess} = require('../lib/index');
-const {strictEqual} = require('assert');
+const { RedisLess } = require('../lib/index');
+const { strictEqual } = require('assert');
 const redis = require('async-redis');
 
-test('exec set get delete commands', async () => {
-    const port = 16379;
-    const redisless = new RedisLess(port);
+jest.setTimeout(1000 * 60);
 
-    strictEqual(redisless.start(), true);
+test('exec set get delete commands', async (done) => {
+  const port = 16379;
+  const redisless = new RedisLess(port);
 
-    const r = redis.createClient({host: 'localhost', port: port});
-    const y = await r.get('key');
+  strictEqual(redisless.start(), true);
 
-    r.set('key', 'value');
-    const x = await r.get('key');
-    strictEqual(x, 'value');
+  const r = redis.createClient({ host: 'localhost', port: port });
+  const y = await r.get('key');
 
-    strictEqual(redisless.stop(), true);
+  await r.set('key', 'value');
+  const x = await r.get('key');
+  strictEqual(x, 'value');
+
+  strictEqual(redisless.stop(), true);
+
+  done();
 });

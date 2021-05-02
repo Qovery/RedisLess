@@ -15,10 +15,14 @@ use storage::in_memory::InMemoryStorage;
 use storage::Storage;
 
 use crate::command::Command;
-use crate::resp::{RedisProtocolParser, RESP};
+use crate::protocol::{RedisProtocolParser, RESP};
 
 mod command;
-mod resp;
+mod protocol;
+
+type CloseConnection = bool;
+type ReceivedDataLength = usize;
+type CommandResponse = Vec<u8>;
 
 fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>) -> bool {
     if let Ok(recv_state) = recv.try_recv() {
@@ -31,10 +35,6 @@ fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>)
 
     false
 }
-
-type CloseConnection = bool;
-type ReceivedDataLength = usize;
-type CommandResponse = Vec<u8>;
 
 fn unlock<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
     loop {
@@ -367,7 +367,7 @@ mod tests {
 
         let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();
 
-        for _ in 0..29 {
+        for _ in 0..9 {
             // run command `PING`
             let _ = stream.write(b"*1\r\n$4\r\nPING\r\n");
             let mut pong_res = [0; 7];
@@ -391,6 +391,12 @@ mod tests {
             let mut del_res = [0; 4];
             let _ = stream.read(&mut del_res);
             assert_eq!(del_res, b":1\r\n"[..]);
+
+            // run command `INFO`
+            let _ = stream.write(b"*1\r\n$4\r\nINFO\r\n");
+            let mut info_res = [0; 6];
+            let _ = stream.read(&mut info_res);
+            assert_eq!(info_res, b"$0\r\n\r\n"[..]);
         }
 
         unsafe {

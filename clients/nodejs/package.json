@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "bench": "node test/bench.js",
-    "test": "eslint --fix . && node test/test.js"
+    "test": "jest --forceExit"
   },
   "keywords": [
     "redisless",
@@ -15,6 +15,10 @@
   ],
   "author": "Romaric Philogene <rphilogene@qovery.com> (https://www.qovery.com)",
   "license": "MIT",
+  "jest": {
+    "verbose": true,
+    "testEnvironment": "node"
+  },
   "dependencies": {
     "ffi-napi": "^4.0.3"
   },
