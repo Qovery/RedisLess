@@ -120,9 +120,9 @@ redisless.stop()
 
 # Planned supported clients
 
-- [ ] NodeJS
-- [ ] Golang
-- [ ] Python
+- [x] [NodeJS](clients/nodejs)
+- [x] [Golang](clients/golang)
+- [x] [Python](clients/python)
 - [ ] Java
 
 # How it works
