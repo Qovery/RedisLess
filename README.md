@@ -1,7 +1,7 @@
 RedisLess
 ===========
 
-[![Discord](https://img.shields.io/discord/688766934917185556?label=discord)](https://discord.qovery.com) [![Test and Build](https://github.com/Qovery/RedisLess/workflows/Test%20and%20Build/badge.svg?branch=main)](https://github.com/Qovery/RedisLess/actions?query=workflow%3A%22Test+and+Build%22) [![dependency status](https://deps.rs/repo/github/Qovery/RedisLess/status.svg)](https://deps.rs/repo/github/Qovery/RedisLess)
+[![Discord](https://img.shields.io/discord/688766934917185556?label=discord)](https://discord.qovery.com) [![Test and Build](https://github.com/Qovery/RedisLess/workflows/Test%20and%20Build/badge.svg?branch=main)](https://github.com/Qovery/RedisLess/actions?query=workflow%3A%22Test+and+Build%22)
 
 ---------
 
@@ -9,14 +9,18 @@ RedisLess
 
 ---------
 
-**RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with the [Redis](https://redis.io/topics/introduction) API.**
+**RedisLess is a fast, lightweight, embedded and scalable in-memory Key/Value store library compatible with
+the [Redis](https://redis.io/topics/introduction) API.**
 
 > RedisLess is the concatenation of Redis and Serverless.
 
 The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
 
 ## Why
-As developers, we often use Redis to share data and states between apps. The problem is that we need to set up a Redis server and manage it. Worst, scaling out Redis on multiple nodes is a nightmare. RedisLess brings you the ease of use of Redis without the inconvenience - directly from your code and without any server to manage.
+
+As developers, we often use Redis to share data and states between apps. The problem is that we need to set up a Redis server and manage it.
+Worst, scaling out Redis on multiple nodes is a nightmare. RedisLess brings you the ease of use of Redis without the inconvenience -
+directly from your code and without any server to manage.
 
 What RedisLess is:
 
@@ -44,6 +48,7 @@ Under the hood, the RedisLess library starts a local Redis API compatible instan
 ## NodeJS client
 
 ### Install
+
 ```bash
 # RedisLess library with Python binding
 npm install redisless
@@ -53,6 +58,7 @@ npm install async-redis
 ```
 
 ### Usage
+
 ```js
 const {RedisLess} = require('redisless');
 const redis = require('async-redis');
@@ -74,6 +80,7 @@ redisless.stop();
 ## Python client
 
 ### Install
+
 ```bash
 # RedisLess library with Python binding
 pip install redisless
@@ -105,27 +112,37 @@ redisless.stop()
 ```
 
 # Planned features
+
 - [ ] Redis API ([see implemented features](REDIS_FEATURES.md))
 - [ ] Cluster mode
 - [ ] Auto-discovery
 - [ ] Disk persistence
 
 # Planned supported clients
+
 - [ ] NodeJS
 - [ ] Golang
 - [ ] Python
 - [ ] Java
 
 # How it works
+
 ![redisless vs redis server](assets/redisless_vs_redis_server.jpg)
 
 # Expected performance
-Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a minimum strain on your server resources (benchmarks will come soon).
 
-RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide clients for NodeJS, Python, Golang, Java, and Rust. Supporting a new language can be done in 5 minutes. Look at [Python](clients/python) and [NodeJS](clients/nodejs) clients implementation for inspiration.
+Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a
+minimum strain on your server resources (benchmarks will come soon).
+
+RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide
+clients for NodeJS, Python, Golang, Java, and Rust. Supporting a new language can be done in 5 minutes. Look at [Python](clients/python)
+and [NodeJS](clients/nodejs) clients implementation for inspiration.
 
 # Contribution welcome!
-It is never too soon to contribute to a great project. If you are interested in contributing, please join us on [Discord](https://discord.qovery.com), then we can discuss. The project is in its early days, but we are serious about building a solid library to help thousands of developers.
+
+It is never too soon to contribute to a great project. If you are interested in contributing, please join us
+on [Discord](https://discord.qovery.com), then we can discuss. The project is in its early days, but we are serious about building a solid
+library to help thousands of developers.
 
 # References
 
