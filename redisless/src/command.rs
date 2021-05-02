@@ -5,7 +5,7 @@ type Key = Vec<u8>;
 type Value = Vec<u8>;
 type Message = &'static str;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
     Get(Key),
@@ -72,6 +72,29 @@ impl Command {
                 )),
             },
             _ => Error("Invalid command to parse"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::command::Command;
+    use crate::protocol::RESP;
+
+    #[test]
+    fn set_command() {
+        let commands = vec![b"SET", b"set"];
+
+        for cmd in commands {
+            let resp = vec![
+                RESP::BulkString(cmd),
+                RESP::BulkString(b"mykey"),
+                RESP::BulkString(b"value"),
+            ];
+
+            let command = Command::parse(resp);
+
+            assert_eq!(command, Command::Set(b"mykey".to_vec(), b"value".to_vec()));
         }
     }
 }
