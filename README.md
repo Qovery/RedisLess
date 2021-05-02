@@ -49,12 +49,26 @@ Under the hood, the RedisLess library starts a local Redis API compatible instan
 npm install redisless
 
 # redis client
-npm install redis
+npm install async-redis
 ```
 
 ### Usage
 ```js
-/* in progress */
+const {RedisLess} = require('redisless');
+const redis = require('async-redis');
+
+const port = 16379;
+const redisless = new RedisLess(port);
+
+redisless.start();
+
+const r = redis.createClient({host: 'localhost', port: port});
+
+await r.set('foo', 'bar');
+await r.get('foo'); // return 'bar'
+await r.del('foo'); // delete key 'foo'
+
+redisless.stop();
 ```
 
 ## Python client
@@ -80,7 +94,7 @@ redisless = RedisLess()
 redisless.start()
 
 # Connect to RedisLess on localhost:16379
-redis = redis.Redis(host='localhost', port=16379, db=0)
+redis = redis.Redis(host='localhost', port=16379)
 
 redis.set('foo', 'bar')
 redis.get('foo')  # return bar 
