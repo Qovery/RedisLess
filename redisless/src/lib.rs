@@ -85,22 +85,22 @@ fn run_command_and_get_response<T: Storage>(
         Some(command) => match command {
             Command::Set(k, v) => {
                 unlock(storage).set(k.as_slice(), v.as_slice());
-                b"+OK\r\n".to_vec()
+                protocol::OK.to_vec()
             }
             Command::Get(k) => match unlock(storage).get(k.as_slice()) {
                 Some(value) => {
                     let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                     res.as_bytes().to_vec()
                 }
-                None => b"$-1\r\n".to_vec(),
+                None => protocol::NIL.to_vec(),
             },
             Command::Del(k) => {
                 let total_del = unlock(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
-            Command::Info => b"$0\r\n\r\n".to_vec(), // TODO change with some real info?
-            Command::Ping => b"+PONG\r\n".to_vec(),
-            Command::Quit => b"+OK\r\n".to_vec(),
+            Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
+            Command::Ping => protocol::PONG.to_vec(),
+            Command::Quit => protocol::OK.to_vec(),
             Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
             Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
         },
@@ -152,6 +152,17 @@ fn start_server<T: Storage + Send + 'static>(
         }
     };
 
+    let thread_pool = match rayon::ThreadPoolBuilder::new()
+        .thread_name(|_| "request handler".to_string())
+        .num_threads(4)
+        .build()
+    {
+        Ok(pool) => pool,
+        Err(err) => {
+            panic!("{:?}", err);
+        }
+    };
+
     // listen incoming requests
     for stream in listener.incoming() {
         match stream {
@@ -160,7 +171,7 @@ fn start_server<T: Storage + Send + 'static>(
                 let state_recv = state_recv.clone();
                 let state_send = state_send.clone();
 
-                let _ = thread::spawn(move || {
+                let _ = thread_pool.spawn(move || {
                     let mut last_update = SystemTime::now();
 
                     loop {
