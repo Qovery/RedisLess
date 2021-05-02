@@ -8,7 +8,7 @@ use crate::server::{Server, ServerState};
 
 mod command;
 mod protocol;
-mod server;
+pub mod server;
 
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_new(port: u16) -> *mut Server {

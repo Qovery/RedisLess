@@ -3,7 +3,7 @@ use std::net::TcpStream;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use redisless::{Server, ServerState};
+use redisless::server::{Server, ServerState};
 use storage::in_memory::InMemoryStorage;
 
 fn criterion_benchmarks(c: &mut Criterion) {
