@@ -2,11 +2,13 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use redisless::{RedisLess, Server, ServerState};
+
+use redisless::{Server, ServerState};
+use storage::in_memory::InMemoryStorage;
 
 fn criterion_benchmarks(c: &mut Criterion) {
     let port = 3335;
-    let server = Server::new(RedisLess::new(), port);
+    let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
 
     let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();

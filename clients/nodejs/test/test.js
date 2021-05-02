@@ -9,6 +9,7 @@ test('exec set get delete commands', async () => {
     strictEqual(redisless.start(), true);
 
     const r = redis.createClient({host: 'localhost', port: port});
+    const y = await r.get('key');
 
     r.set('key', 'value');
     const x = await r.get('key');

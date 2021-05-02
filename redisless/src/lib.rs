@@ -10,59 +10,17 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
-
 use mpb::MPB;
+use redis::Commands;
+
+use storage::in_memory::InMemoryStorage;
+use storage::Storage;
 
 use crate::command::Command;
 use crate::resp::{RedisProtocolParser, RESP};
 
 mod command;
 mod resp;
-
-pub struct RedisLess {
-    data_mapper: HashMap<Vec<u8>, DataType>,
-    string_store: HashMap<Vec<u8>, Vec<u8>>,
-}
-
-enum DataType {
-    String,
-    List,
-    Set,
-    Hash,
-}
-
-impl RedisLess {
-    pub fn new() -> Self {
-        RedisLess {
-            data_mapper: HashMap::new(),
-            string_store: HashMap::new(),
-        }
-    }
-
-    pub fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), value.to_vec());
-    }
-
-    pub fn get(&self, key: &[u8]) -> Option<&[u8]> {
-        self.string_store.get(key).map(|v| &v[..])
-    }
-
-    pub fn del(&mut self, key: &[u8]) -> u32 {
-        match self.data_mapper.get(key) {
-            Some(data_type) => match data_type {
-                DataType::String => match self.string_store.remove(key) {
-                    Some(_) => 1,
-                    None => 0,
-                },
-                DataType::List => 0,
-                DataType::Set => 0,
-                DataType::Hash => 0,
-            },
-            None => 0,
-        }
-    }
-}
 
 fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>) -> bool {
     if let Ok(recv_state) = recv.try_recv() {
@@ -80,11 +38,11 @@ type CloseConnection = bool;
 type ReceivedDataLength = usize;
 type CommandResponse = Vec<u8>;
 
-fn unlock(redisless: &Arc<Mutex<RedisLess>>) -> MutexGuard<RedisLess> {
+fn unlock<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
     loop {
-        match redisless.lock() {
-            Ok(redisless) => {
-                return redisless;
+        match storage.lock() {
+            Ok(storage) => {
+                return storage;
             }
             Err(_) => {
                 thread::sleep(Duration::from_millis(10));
@@ -119,8 +77,8 @@ fn get_command(bytes: &[u8; 512]) -> Option<Command> {
     }
 }
 
-fn run_command_and_get_response(
-    redisless: &Arc<Mutex<RedisLess>>,
+fn run_command_and_get_response<T: Storage>(
+    storage: &Arc<Mutex<T>>,
     bytes: &[u8; 512],
 ) -> (Option<Command>, CommandResponse) {
     let command = get_command(bytes);
@@ -128,10 +86,10 @@ fn run_command_and_get_response(
     let response = match &command {
         Some(command) => match command {
             Command::Set(k, v) => {
-                unlock(redisless).set(k.as_slice(), v.as_slice());
+                unlock(storage).set(k.as_slice(), v.as_slice());
                 b"+OK\r\n".to_vec()
             }
-            Command::Get(k) => match unlock(redisless).get(k.as_slice()) {
+            Command::Get(k) => match unlock(storage).get(k.as_slice()) {
                 Some(value) => {
                     let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                     res.as_bytes().to_vec()
@@ -139,7 +97,7 @@ fn run_command_and_get_response(
                 None => b"$-1\r\n".to_vec(),
             },
             Command::Del(k) => {
-                let total_del = unlock(redisless).del(k.as_slice());
+                let total_del = unlock(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
             Command::Info => b"$0\r\n\r\n".to_vec(), // TODO change with some real info?
@@ -154,8 +112,8 @@ fn run_command_and_get_response(
     (command, response)
 }
 
-fn handle_request(
-    redisless: &Arc<Mutex<RedisLess>>,
+fn handle_request<T: Storage>(
+    storage: &Arc<Mutex<T>>,
     mut stream: &TcpStream,
 ) -> (CloseConnection, ReceivedDataLength) {
     let (buf, buf_length) = get_bytes_from_request(stream);
@@ -167,7 +125,7 @@ fn handle_request(
         _ => {}
     }
 
-    let (command, res) = run_command_and_get_response(redisless, &buf);
+    let (command, res) = run_command_and_get_response(storage, &buf);
 
     let _ = stream.write(res.as_slice());
 
@@ -177,11 +135,11 @@ fn handle_request(
     }
 }
 
-fn start_server(
+fn start_server<T: Storage + Send + 'static>(
     addr: &String,
     state_send: &Sender<ServerState>,
     state_recv: &Receiver<ServerState>,
-    redisless: &Arc<Mutex<RedisLess>>,
+    storage: &Arc<Mutex<T>>,
 ) {
     let listener = match TcpListener::bind(addr) {
         Ok(listener) => {
@@ -200,7 +158,7 @@ fn start_server(
     for stream in listener.incoming() {
         match stream {
             Ok(tcp_stream) => {
-                let redisless = redisless.clone();
+                let storage = storage.clone();
                 let state_recv = state_recv.clone();
                 let state_send = state_send.clone();
 
@@ -209,7 +167,7 @@ fn start_server(
 
                     loop {
                         let (close_connection, received_data_length) =
-                            handle_request(&redisless, &tcp_stream);
+                            handle_request(&storage, &tcp_stream);
 
                         if received_data_length > 0 {
                             // reset the last time we received data
@@ -270,28 +228,32 @@ pub enum ServerState {
 }
 
 impl Server {
-    pub fn new(redisless: RedisLess, port: u16) -> Self {
+    pub fn new<T: Storage + Send + 'static>(storage: T, port: u16) -> Self {
         let s = Server {
             server_state_bus: MPB::new(),
         };
 
-        s._init_configuration(format!("0.0.0.0:{}", port), redisless);
+        s._init_configuration(format!("0.0.0.0:{}", port), storage);
         s
     }
 
-    fn _init_configuration<A: Into<String>>(&self, addr: A, redisless: RedisLess) {
+    fn _init_configuration<A: Into<String>, T: Storage + Send + 'static>(
+        &self,
+        addr: A,
+        storage: T,
+    ) {
         let addr = addr.into();
         let state_send = self.server_state_bus.tx();
         let state_recv = self.server_state_bus.rx();
 
         let _ = thread::spawn(move || {
             let addr = addr;
-            let redisless = Arc::new(Mutex::new(redisless));
+            let storage = Arc::new(Mutex::new(storage));
 
             loop {
                 if let Ok(server_state) = state_recv.recv() {
                     if server_state == ServerState::Start {
-                        start_server(&addr, &state_send, &state_recv, &redisless);
+                        start_server(&addr, &state_send, &state_recv, &storage);
                     }
                 }
             }
@@ -347,7 +309,7 @@ impl Server {
 
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_new(port: u16) -> *mut Server {
-    Box::into_raw(Box::new(Server::new(RedisLess::new(), port)))
+    Box::into_raw(Box::new(Server::new(InMemoryStorage::new(), port)))
 }
 
 #[no_mangle]
@@ -388,9 +350,11 @@ mod tests {
 
     use redis::{Commands, RedisResult};
 
+    use storage::in_memory::InMemoryStorage;
+
     use crate::{
         redisless_server_free, redisless_server_new, redisless_server_start, redisless_server_stop,
-        RedisLess, Server, ServerState,
+        Server, ServerState,
     };
 
     #[test]
@@ -438,20 +402,10 @@ mod tests {
     }
 
     #[test]
-    fn test_set_get_and_del() {
-        let mut redisless = RedisLess::new();
-        redisless.set(b"key", b"xxx");
-        assert_eq!(redisless.get(b"key"), Some(&b"xxx"[..]));
-        assert_eq!(redisless.del(b"key"), 1);
-        assert_eq!(redisless.del(b"key"), 0);
-        assert_eq!(redisless.get(b"does not exist"), None);
-    }
-
-    #[test]
     #[serial]
     fn test_redis_implementation() {
         let port = 16379;
-        let server = Server::new(RedisLess::new(), port);
+        let server = Server::new(InMemoryStorage::new(), port);
 
         assert_eq!(server.start(), Some(ServerState::Started));
 
@@ -481,14 +435,14 @@ mod tests {
     #[test]
     #[serial]
     fn start_and_stop_server() {
-        let server = Server::new(RedisLess::new(), 3333);
+        let server = Server::new(InMemoryStorage::new(), 3333);
         assert_eq!(server.start(), Some(ServerState::Started));
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
     #[test]
     fn start_and_stop_server_multiple_times() {
-        let server = Server::new(RedisLess::new(), 3334);
+        let server = Server::new(InMemoryStorage::new(), 3334);
 
         for _ in 0..9 {
             assert_eq!(server.start(), Some(ServerState::Started));

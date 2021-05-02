@@ -14,6 +14,7 @@ crate-type = ["rlib", "dylib"]
 
 [dependencies]
 mpb = { path = "mpb" }
+storage = { path = "storage" }
 crossbeam-channel = "0.5.1"
 
 [dev-dependencies]
