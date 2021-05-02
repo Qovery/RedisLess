@@ -1,4 +1,4 @@
-module redisless
+module github.com/qovery/redisless/clients/golang
 
 go 1.16
 
