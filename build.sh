@@ -24,7 +24,7 @@ cp redisless/target/release/libredisless.dylib clients/python/src/libredisless.d
 cp redisless/target/release/libredisless.dylib clients/nodejs/lib/libredisless.dylib
 
 # MacOSX Golang
-cp redisless/target/release/libredisless.dylib clients/golang/libredisless.dylib
+cp redisless/target/release/libredisless.dylib clients/golang/lib/libredisless.dylib
 
 # Windows Python
 cp redisless/target/x86_64-pc-windows-gnu/release/redisless.dll clients/python/src/libredisless.dll
@@ -33,7 +33,7 @@ cp redisless/target/x86_64-pc-windows-gnu/release/redisless.dll clients/python/s
 cp redisless/target/x86_64-pc-windows-gnu/release/redisless.dll clients/nodejs/lib/libredisless.dll
 
 # Windows Golang
-cp redisless/target/x86_64-pc-windows-gnu/release/redisless.dll clients/golang/libredisless.dll
+cp redisless/target/x86_64-pc-windows-gnu/release/redisless.dll clients/golang/lib/libredisless.dll
 
 # Linux Python
 cp redisless/target/x86_64-unknown-linux-gnu/release/libredisless.so clients/python/src/libredisless.so
@@ -42,4 +42,4 @@ cp redisless/target/x86_64-unknown-linux-gnu/release/libredisless.so clients/pyt
 cp redisless/target/x86_64-unknown-linux-gnu/release/libredisless.so clients/nodejs/lib/libredisless.so
 
 # Linux Golang
-cp redisless/target/x86_64-unknown-linux-gnu/release/libredisless.so clients/golang/libredisless.so
+cp redisless/target/x86_64-unknown-linux-gnu/release/libredisless.so clients/golang/lib/libredisless.so
