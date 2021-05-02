@@ -144,6 +144,10 @@ It is never too soon to contribute to a great project. If you are interested in 
 on [Discord](https://discord.qovery.com), then we can discuss. The project is in its early days, but we are serious about building a solid
 library to help thousands of developers.
 
+## Dependencies for contributors
+
+Read comments inside the [build.sh](build.sh) script.
+
 # References
 
 - Redis Internals: [Free e-book](https://redislabs.com/ebook)
