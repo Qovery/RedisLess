@@ -8,14 +8,30 @@
 # 5 Run `brew tap SergioBenitez/osxct && brew install x86_64-unknown-linux-gnu`
 
 rustup target add x86_64-pc-windows-gnu
-# rustup target add x86_64-unknown-linux-musl
 rustup target add x86_64-unknown-linux-gnu
 
-# Clean libs
-cd redisless && cargo clean && cd ..
+# Let's build
+cd redisless && cargo clean && cargo build --release
 
-# Build libs
-cd redisless && cargo build --release && cargo build --target x86_64-pc-windows-gnu --release && cargo build --target x86_64-unknown-linux-gnu --release && cd ..
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  # Linux
+  echo "Platform Linux detected"
+  cargo build --target x86_64-pc-windows-gnu --release
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  # Mac OSX
+  echo "Platform MacOSX detected"
+  cargo build --target x86_64-pc-windows-gnu --release
+  cargo build --target x86_64-unknown-linux-gnu --release
+elif [[ "$OSTYPE" == "win32" ]]; then
+  # Windows
+  echo "Platform Windows detected"
+  cargo build --target x86_64-unknown-linux-gnu --release
+else
+  echo "Platform not supported"
+  exit 1
+fi
+
+cd ..
 
 # MacOSX Python
 cp redisless/target/release/libredisless.dylib clients/python/src/libredisless.dylib
