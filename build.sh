@@ -8,7 +8,7 @@
 # 5 Run `brew tap SergioBenitez/osxct && brew install x86_64-unknown-linux-gnu`
 
 rustup target add x86_64-pc-windows-gnu
-rustup target add x86_64-unknown-linux-musl
+# rustup target add x86_64-unknown-linux-musl
 rustup target add x86_64-unknown-linux-gnu
 
 # Clean libs
