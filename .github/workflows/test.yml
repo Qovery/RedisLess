@@ -47,8 +47,8 @@ jobs:
             tests/integration/runner/node_modules
           key: ${{ runner.os }}-integration-${{ matrix.rust-toolchain }}
 
-      - name: Build RedisLess
-        run: cd redisless && cargo build
+      - name: Build RedisLess with multiple targets
+        run: ./build.sh
 
       - name: Test RedisLess
         run: cd redisless && cargo test
