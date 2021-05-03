@@ -31,6 +31,9 @@ jobs:
         with:
           platform: x64
 
+      - name: Install Build Essentials
+        run: sudo apt-get install build-essential
+
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && node --version && npm --version
 
