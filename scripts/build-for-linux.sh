@@ -4,11 +4,17 @@ rustup target add x86_64-pc-windows-gnu
 rustup target add x86_64-apple-darwin
 
 # Let's build
-cd ../redisless
+cd redisless
 
 cargo clean
+
+# build for Linux
 cargo build --release
+
+# cross build for MacOSX
 RUSTFLAGS="-C linker=x86_64-apple-darwin14-clang" cargo build --target x86_64-apple-darwin --release
+
+# cross build for Windows
 RUSTFLAGS="-C linker=x86_64-w64-mingw32-gcc" cargo build --target x86_64-pc-windows-gnu --release
 
 cd ..
