@@ -32,7 +32,7 @@ jobs:
           platform: x64
 
       - name: Install Build Essentials
-        run: sudo apt-get install build-essential
+        run: sudo apt-get install build-essential mingw-w64
 
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && node --version && npm --version
@@ -61,8 +61,8 @@ jobs:
       - name: Test RedisLess
         run: cd redisless && cargo test
 
-      - name: Bench RedisLess
-        run: cd redisless && cargo bench
+      #- name: Bench RedisLess
+      #  run: cd redisless && cargo bench
 
       - name: Check RedisLess code style
         run: cd redisless && cargo fmt -- --check
