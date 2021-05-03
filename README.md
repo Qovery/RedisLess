@@ -5,7 +5,7 @@ RedisLess
 
 ---------
 
-**THIS PROJECT IS NOT PRODUCTION READY AT ALL - WIP!!**
+**THIS PROJECT IS TESTABLE, BUT NOT PRODUCTION READY YET!!**
 
 ---------
 
@@ -14,16 +14,15 @@ the [Redis](https://redis.io/topics/introduction) API.**
 
 > RedisLess is the concatenation of Redis and Serverless.
 
-## Content about RedisLess
-The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
+# The starting point
 
-## The starting point
+[Romaric](https://twitter.com/rophilogene), initiator of RedisLess:
 
-I am a backend engineer. And as a backend developer, I mostly work on providing web API for frontend developers and backend developers. Redis is part of my toolset - especially when I share data and sync states between my backend apps. One of the downsides of Redis (like for all databases) is that you need to spawn a Redis server and maintain it.
+> I am a backend engineer. And as a backend developer, I mostly work on providing web API for frontend developers and backend developers. Redis is part of my toolset - especially when I share data and sync states between my backend apps. One of the downsides of Redis (like for all databases) is that you need to spawn a Redis server and maintain it.
 
-So, imagine a world where your Redis instance is nothing more than a lib in your app. Imagine that this lib can sync the data with other neighborhood instances?
+> So, imagine a world where your Redis instance is nothing more than a lib in your app. Imagine that this lib can sync the data with other neighborhood instances?
 
-That's the idea behind RedisLess, a lightweight, embedded, and scalable in-memory Key/Value store library compatible with the Redis API.
+> That's the idea behind RedisLess, a lightweight, embedded, and scalable in-memory Key/Value store library compatible with the Redis API.
 
 Read more about RedisLess:
 * The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
