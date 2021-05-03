@@ -14,26 +14,20 @@ the [Redis](https://redis.io/topics/introduction) API.**
 
 > RedisLess is the concatenation of Redis and Serverless.
 
+## Content about RedisLess
 The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
 
-## Why
+## The starting point
 
-As developers, we often use Redis to share data and states between apps. The problem is that we need to set up a Redis server and manage it.
-Worst, scaling out Redis on multiple nodes is a nightmare. RedisLess brings you the ease of use of Redis without the inconvenience -
-directly from your code and without any server to manage.
+I am a backend engineer. And as a backend developer, I mostly work on providing web API for frontend developers and backend developers. Redis is part of my toolset - especially when I share data and sync states between my backend apps. One of the downsides of Redis (like for all databases) is that you need to spawn a Redis server and maintain it.
 
-What RedisLess is:
+So, imagine a world where your Redis instance is nothing more than a lib in your app. Imagine that this lib can sync the data with other neighborhood instances?
 
-* Embedded in-memory. (No Redis server required!).
-* Compatible with the Redis API (RESP).
-* Not intrusive: you don't need to modify you code to use RedisLess!
-* Built with DX and performance in mind.
-* Cloud native friendly.
+That's the idea behind RedisLess, a lightweight, embedded, and scalable in-memory Key/Value store library compatible with the Redis API.
 
-What RedisLess is not:
-
-* Production ready yet.
-* 1:1 Redis implementation.
+Read more about RedisLess:
+* The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
+* [Interesting discussion about RedisLess](https://www.reddit.com/r/rust/comments/n3d1zw/i_am_building_a_serverless_version_of_redis/) on Reddit.
 
 # How to use it?
 
@@ -111,6 +105,20 @@ redis.delete('foo')  # return 1
 redisless.stop()
 ```
 
+
+# What is RedisLess
+
+* Embedded in-memory. (No Redis server required!).
+* Compatible with the Redis API (RESP).
+* Not intrusive: you don't need to modify you code to use RedisLess!
+* Built with DX and performance in mind.
+* Cloud native friendly.
+
+What RedisLess is not:
+
+* Production ready yet.
+* 1:1 Redis implementation.
+
 # Planned features
 
 - [ ] Redis API ([see implemented features](REDIS_FEATURES.md))
@@ -124,10 +132,6 @@ redisless.stop()
 - [x] [Golang](clients/golang)
 - [x] [Python](clients/python)
 - [ ] Java
-
-# How it works
-
-![redisless vs redis server](assets/redisless_vs_redis_server.jpg)
 
 # Expected performance
 
