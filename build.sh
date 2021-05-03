@@ -16,16 +16,16 @@ cd redisless && cargo clean && cargo build --release
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   # Linux
   echo "Platform Linux detected"
-  cargo build --target x86_64-pc-windows-gnu --release
+  RUSTFLAGS="-C linker=x86_64-w64-mingw32-gcc" cargo build --target x86_64-pc-windows-gnu --release
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   # Mac OSX
   echo "Platform MacOSX detected"
-  cargo build --target x86_64-pc-windows-gnu --release
-  cargo build --target x86_64-unknown-linux-gnu --release
+  RUSTFLAGS="-C linker=x86_64-w64-mingw32-gcc" cargo build --target x86_64-pc-windows-gnu --release
+  RUSTFLAGS="-C linker=x86_64-unknown-linux-gnu-gcc" cargo build --target x86_64-unknown-linux-gnu --release
 elif [[ "$OSTYPE" == "win32" ]]; then
   # Windows
   echo "Platform Windows detected"
-  cargo build --target x86_64-unknown-linux-gnu --release
+  RUSTFLAGS="-C linker=x86_64-unknown-linux-gnu-gcc" cargo build --target x86_64-unknown-linux-gnu --release
 else
   echo "Platform not supported"
   exit 1
