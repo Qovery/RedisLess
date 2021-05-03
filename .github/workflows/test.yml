@@ -56,7 +56,7 @@ jobs:
           key: ${{ runner.os }}-integration-${{ matrix.rust-toolchain }}
 
       - name: Build RedisLess with multiple targets
-        run: bash build.sh
+        run: bash scripts/build-for-linux.sh
 
       - name: Test RedisLess
         run: cd redisless && cargo test

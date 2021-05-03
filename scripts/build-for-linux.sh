@@ -4,7 +4,7 @@ rustup target add x86_64-pc-windows-gnu
 rustup target add x86_64-apple-darwin
 
 # Let's build
-cd redisless
+cd ../redisless
 
 cargo clean
 cargo build --release
