@@ -26,13 +26,8 @@ jobs:
       - name: Install NodeJS
         uses: actions/setup-node@v1
 
-      - name: Set up GCC
-        uses: egor-tensin/setup-gcc@v1
-        with:
-          platform: x64
-
       - name: Install Build Essentials
-        run: sudo apt-get install build-essential mingw-w64
+        run: sudo apt-get install build-essential mingw-w64 gcc
 
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && node --version && npm --version
