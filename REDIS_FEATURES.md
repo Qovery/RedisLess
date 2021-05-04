@@ -2,7 +2,12 @@
 
 ## Supported Redis commands
 
-- [ ] `set`
-- [ ] `get`
-- [ ] `del`
-- [ ] `ping`
+- [x] `set`
+- [x] `get`
+- [x] `del`
+- [x] `ping`
+- [x] `info`
+- [ ] `incr`
+- [ ] `incrby`
+- [ ] `decr`
+- [ ] `decrby`
