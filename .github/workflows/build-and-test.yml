@@ -1,4 +1,4 @@
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 name: Build and test
 
@@ -6,7 +6,7 @@ jobs:
   test:
     strategy:
       matrix:
-        rust-toolchain: [stable]
+        rust-toolchain: [ stable ]
       fail-fast: false
 
     runs-on: macos-latest
@@ -20,8 +20,18 @@ jobs:
           brew tap SergioBenitez/osxct
           brew install x86_64-unknown-linux-gnu
 
+      - name: Cache dependencies
+        id: cache-dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/*
+            ~/Library/Caches/Homebrew/downloads/*
+          key: brew-${{ hashFiles('.github/brew-formulae') }}
+          restore-keys: brew-
+
       - name: Build RedisLess with multiple targets
-        run: pwd && ls -lh && bash scripts/build-for-mac.sh
+        run: ./scripts/build-for-mac.sh
 
       - name: Test RedisLess
         run: cd redisless && cargo test
