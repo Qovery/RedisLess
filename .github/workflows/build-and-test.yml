@@ -1,0 +1,33 @@
+on: [push, pull_request]
+
+name: Build and test
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        rust-toolchain: [stable]
+      fail-fast: false
+
+    runs-on: macos-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          brew install mingw-w64
+          brew install FiloSottile/musl-cross/musl-cross
+          brew tap SergioBenitez/osxct
+          brew install x86_64-unknown-linux-gnu
+
+      - name: Build RedisLess with multiple targets
+        run: bash scripts/build-for-mac.sh
+
+      - name: Test RedisLess
+        run: cd redisless && cargo test
+
+      - name: Bench RedisLess
+        run: cd redisless && cargo bench
+
+      - name: Check RedisLess code style
+        run: cd redisless && cargo fmt -- --check
+

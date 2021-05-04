@@ -12,7 +12,8 @@ cargo clean
 cargo build --release
 
 # cross build for MacOSX
-RUSTFLAGS="-C linker=x86_64-apple-darwin14-clang" cargo build --target x86_64-apple-darwin --release
+#RUSTFLAGS="-C linker=x86_64-apple-darwin14-clang" cargo build --target x86_64-apple-darwin --release
+cargo build --target x86_64-apple-darwin --release
 
 # cross build for Windows
 RUSTFLAGS="-C linker=x86_64-w64-mingw32-gcc" cargo build --target x86_64-pc-windows-gnu --release
