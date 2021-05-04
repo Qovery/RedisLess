@@ -147,9 +147,27 @@ It is never too soon to contribute to a great project. If you are interested in 
 on [Discord](https://discord.qovery.com), then we can discuss. The project is in its early days, but we are serious about building a solid
 library to help thousands of developers.
 
-## Dependencies for contributors
+## Set up MacOSX development environment
 
-Read comments inside the [build.sh](build.sh) script.
+### Pre-requisites
+1. Install [Xcode](https://developer.apple.com/xcode/)
+2. Install [Brew](https://brew.sh/)   
+3. Install [Rust](https://www.rust-lang.org/tools/install)
+4. Run `brew install mingw-w64` to cross build for Windows
+5. Run `brew install FiloSottile/musl-cross/musl-cross` to cross build for Linux 
+6. Run `brew tap SergioBenitez/osxct && brew install x86_64-unknown-linux-gnu` # to cross build for Linux
+
+### Build clients
+
+To build NodeJS, Python, Golang and other libs you need to run:
+
+```bash
+cd scripts && ./build-for-mac.sh && cd ..
+```
+
+### Use clients
+
+Once the libs built, you are ready to use the clients into the [clients](clients) folder.
 
 # References
 
