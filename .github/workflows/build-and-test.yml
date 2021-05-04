@@ -21,7 +21,7 @@ jobs:
           brew install x86_64-unknown-linux-gnu
 
       - name: Build RedisLess with multiple targets
-        run: pwd && bash scripts/build-for-mac.sh
+        run: pwd && ls -lh && bash scripts/build-for-mac.sh
 
       - name: Test RedisLess
         run: cd redisless && cargo test
