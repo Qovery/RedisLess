@@ -10,7 +10,7 @@ license = "MIT"
 
 [lib]
 name = "redisless"
-crate-type = ["rlib", "dylib", "cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 mpb = { path = "mpb" }
