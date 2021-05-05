@@ -10,6 +10,7 @@ pub enum Command {
     Set(Key, Value),
     Get(Key),
     Del(Key),
+    Incr(Key),
     Info,
     Ping,
     Quit,
@@ -62,6 +63,17 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'DEL' command")
+                }
+                b"INCR" | b"incr" | b"Incr" => {
+                    if v.len() != 2 {
+                        return Error("wrong number of arguments for 'INCR' command");
+                    }
+
+                    if let Some(arg1) = get_bytes_vec(v.get(1)) {
+                        return Command::Incr(arg1);
+                    }
+
+                    Error("wrong number of arguments for 'INCR' command")
                 }
                 b"INFO" | b"info" | b"Info" => Command::Info,
                 b"PING" | b"ping" | b"Ping" => Command::Ping,
