@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::Storage;
+use crate::storage::Storage;
 
 pub struct InMemoryStorage {
     data_mapper: HashMap<Vec<u8>, DataType>,

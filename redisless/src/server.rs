@@ -7,11 +7,10 @@ use std::time::{Duration, SystemTime};
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
 
-use storage::Storage;
-
 use crate::command::Command;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, RESP};
+use crate::storage::Storage;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -184,27 +183,26 @@ fn run_command_and_get_response<T: Storage>(
             Command::Del(k) => {
                 let total_del = unlock(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
-            },
-            Command::Incr(k) => {
-                match unlock(storage).get(k.as_slice()) {
-                    Some(value) => {
-                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>() {
-                            int_val += 1;
-                            let new_value = int_val.to_string().into_bytes();
-                            unlock(storage).set(k.as_slice(), new_value.as_slice());
+            }
+            Command::Incr(k) => match unlock(storage).get(k.as_slice()) {
+                Some(value) => {
+                    if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>() {
+                        int_val += 1;
+                        let new_value = int_val.to_string().into_bytes();
+                        unlock(storage).set(k.as_slice(), new_value.as_slice());
 
-                            format!(":{}\r\n", int_val).as_bytes().to_vec()
-                        } else {
-                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}".to_vec()
-                        }
-                    },
-                    None => {
-                        let val = "1";
-                        unlock(storage).set(k, val.as_bytes());
-                        format!(":{}\r\n", val).as_bytes().to_vec()
+                        format!(":{}\r\n", int_val).as_bytes().to_vec()
+                    } else {
+                        b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                            .to_vec()
                     }
                 }
-            }
+                None => {
+                    let val = "1";
+                    unlock(storage).set(k, val.as_bytes());
+                    format!(":{}\r\n", val).as_bytes().to_vec()
+                }
+            },
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
             Command::Quit => protocol::OK.to_vec(),
@@ -331,11 +329,10 @@ fn start_server<T: Storage + Send + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use redis::{Commands, RedisResult, cmd};
-
-    use storage::in_memory::InMemoryStorage;
+    use redis::{cmd, Commands, RedisResult};
 
     use crate::server::ServerState;
+    use crate::storage::in_memory::InMemoryStorage;
     use crate::Server;
 
     #[test]
@@ -367,7 +364,8 @@ mod tests {
         assert_eq!(x, "value2");
 
         let _: () = con.set("intkey", "10").unwrap();
-        con.send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice()).unwrap();
+        con.send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice())
+            .unwrap();
         let x: String = con.get("intkey").unwrap();
         assert_eq!(x, "11");
 
