@@ -192,18 +192,16 @@ fn run_command_and_get_response<T: Storage>(
                             int_val += 1;
                             let new_value = int_val.to_string().into_bytes();
                             unlock(storage).set(k.as_slice(), new_value.as_slice());
-                            let res = format!(":{}\r\n", int_val);
-                            res.as_bytes().to_vec()
+
+                            format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
-                            let res = format!("-WRONGTYPE Operation against a key holding the wrong kind of value}}");
-                            res.as_bytes().to_vec()
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}".to_vec()
                         }
                     },
                     None => {
                         let val = "1";
                         unlock(storage).set(k, val.as_bytes());
-                        let res = format!(":{}\r\n", val);
-                        res.as_bytes().to_vec()
+                        format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
             }
@@ -337,7 +335,7 @@ mod tests {
 
     use storage::in_memory::InMemoryStorage;
 
-    use crate::server::{ServerState, run_command_and_get_response};
+    use crate::server::ServerState;
     use crate::Server;
 
     #[test]
