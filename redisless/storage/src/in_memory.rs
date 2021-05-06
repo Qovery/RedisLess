@@ -76,14 +76,13 @@ impl Storage for InMemoryStorage {
     }
 
     fn get(&mut self, key: &[u8]) -> Option<&[u8]> {
-        // very ugly lol
-        if self.string_store.get(key).is_some() {
-            match self.string_store.get(key).unwrap().is_expired() {
+        if let Some(value ) = self.string_store.get(key) {
+            match value.is_expired() {
                 true => {
                     self.del(key);
-                    return None;
+                    None
                 }
-                false => {Some(&self.string_store.get(key).unwrap().data[..])}
+                false => Some(&self.string_store.get(key).unwrap().data[..]),
             }
         } else {
             None
@@ -108,6 +107,8 @@ impl Storage for InMemoryStorage {
 
 #[cfg(test)]
 mod tests {
+    use std::{thread::sleep, time::Duration};
+
     use crate::in_memory::InMemoryStorage;
     use crate::Storage;
 
@@ -119,5 +120,26 @@ mod tests {
         assert_eq!(mem.del(b"key"), 1);
         assert_eq!(mem.del(b"key"), 0);
         assert_eq!(mem.get(b"does not exist"), None);
+    }
+
+    #[test]
+    fn test_setex() {
+        let mut mem = InMemoryStorage::new();
+        let duration: u64 = 4;
+        mem.setex(b"key", b"xxx", 4);
+        assert_eq!(mem.get(b"key"), Some(&b"xxx"[..]));
+        sleep(Duration::from_secs(duration));
+        assert_eq!(mem.get(b"xxx"), None);
+    }
+
+    #[test]
+    fn test_expire() {
+        let mut mem = InMemoryStorage::new();
+        let duration: u64 = 4;
+        mem.set(b"key", b"xxx");
+        mem.expire(b"key", duration);
+        assert_eq!(mem.get(b"key"), Some(&b"xxx"[..]));
+        sleep(Duration::from_secs(duration));
+        assert_eq!(mem.get(b"key"), None);
     }
 }
