@@ -3,7 +3,17 @@ use std::{collections::HashMap, usize};
 use crate::Storage;
 
 type Expiry = Option<usize>;
-type RedisValue = (Vec<u8>, Expiry);
+
+pub struct RedisValue {
+    pub data: Vec<u8>,
+    expiry: Expiry,
+}
+
+impl RedisValue {
+    pub fn new(data: Vec<u8>, expiry: Expiry) -> Self {
+        RedisValue { data, expiry }
+    }
+}
 
 pub struct InMemoryStorage {
     data_mapper: HashMap<Vec<u8>, DataType>,
@@ -29,16 +39,16 @@ impl InMemoryStorage {
 impl Storage for InMemoryStorage {
     fn set(&mut self, key: &[u8], value: &[u8]) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), (value.to_vec(), None));
+        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
     fn setex(&mut self, key: &[u8], value: &[u8], expiry: usize) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), (value.to_vec(), Some(expiry)));
+        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), Some(expiry)));
     }
 
     fn get(&self, key: &[u8]) -> Option<&[u8]> {
-        self.string_store.get(key).map(|v| &v.0[..])
+        self.string_store.get(key).map(|v| &v.data[..])
     }
 
     fn del(&mut self, key: &[u8]) -> u32 {
