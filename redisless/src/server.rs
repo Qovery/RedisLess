@@ -213,7 +213,7 @@ fn run_command_and_get_response<T: Storage>(
             Command::Expire(k, v) => {
                 match unlock(storage).get(k.as_slice()) {
                     Some(_) => {
-                        if let Ok(expiration) = std::str::from_utf8(value).unwrap().parse::<u64>() {
+                        if let Ok(expiration) = std::str::from_utf8(v).unwrap().parse::<u64>() {
                             let i = unlock(storage).expire(k.as_slice(), expiration.to_string().into_bytes().as_slice());
                             if i == 1 {
                                 format!(":{}\r\n", "1").as_bytes().to_vec()
