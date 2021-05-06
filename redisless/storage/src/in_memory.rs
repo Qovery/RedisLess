@@ -1,18 +1,39 @@
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap, time::{Duration, Instant}};
 
 use crate::Storage;
 
-type Expiry = Option<usize>;
+#[derive(Debug, PartialEq)]
+pub struct Expiry {
+    timestamp: Instant,
+    pub duration: u64,
+}
 
+impl Expiry {
+    pub fn new(duration: u64) -> Self {
+        Self {
+            timestamp: Instant::now(),
+            duration,
+        }
+    }
+}
 #[derive(Debug, PartialEq)]
 pub struct RedisValue {
     pub data: Vec<u8>,
-    expiry: Expiry,
+    pub expiry: Option<Expiry>,
 }
 
 impl RedisValue {
-    pub fn new(data: Vec<u8>, expiry: Expiry) -> Self {
+    pub fn new(data: Vec<u8>, expiry: Option<Expiry>) -> Self {
         RedisValue { data, expiry }
+    }
+
+    pub fn is_expired(&self) -> bool {
+        if let Some(expiry) = &self.expiry {
+            if expiry.timestamp.elapsed() >= Duration::from_secs(expiry.duration) {
+                return true
+            }
+        }
+        false
     }
 }
 
@@ -43,17 +64,30 @@ impl Storage for InMemoryStorage {
         self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
-    fn expire(&mut self, key: &[u8], expiry: usize) {
-        self.string_store.entry(key.to_vec()).and_modify(|v| v.expiry = Some(expiry));
+    fn expire(&mut self, key: &[u8], duration: u64) {
+        self.string_store.entry(key.to_vec()).and_modify(|v| {
+            v.expiry = Some(Expiry::new(duration))
+        });
     }
 
-    fn setex(&mut self, key: &[u8], value: &[u8], expiry: usize) {
+    fn setex(&mut self, key: &[u8], value: &[u8], duration: u64) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), Some(expiry)));
+        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), Some(Expiry::new(duration))));
     }
 
-    fn get(&self, key: &[u8]) -> Option<&[u8]> {
-        self.string_store.get(key).map(|v| &v.data[..])
+    fn get(&mut self, key: &[u8]) -> Option<&[u8]> {
+        // very ugly lol
+        if self.string_store.get(key).is_some() {
+            match self.string_store.get(key).unwrap().is_expired() {
+                true => {
+                    self.del(key);
+                    return None;
+                }
+                false => {Some(&self.string_store.get(key).unwrap().data[..])}
+            }
+        } else {
+            None
+        }
     }
 
     fn del(&mut self, key: &[u8]) -> u32 {

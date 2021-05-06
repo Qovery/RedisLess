@@ -17,6 +17,7 @@ mpb = { path = "mpb" }
 storage = { path = "storage" }
 crossbeam-channel = "0.5.1"
 rayon = "1.5.0"
+bincode = "1.3.3"
 
 [dev-dependencies]
 redis = "0.20"
