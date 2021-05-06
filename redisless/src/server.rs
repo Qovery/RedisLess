@@ -184,7 +184,7 @@ fn run_command_and_get_response<T: Storage>(
             Command::Del(k) => {
                 let total_del = unlock(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
-            },
+            }
             Command::Incr(k) => {
                 match unlock(storage).get(k.as_slice()) {
                     Some(value) => {
@@ -197,7 +197,7 @@ fn run_command_and_get_response<T: Storage>(
                         } else {
                             b"-WRONGTYPE Operation against a key holding the wrong kind of value}}".to_vec()
                         }
-                    },
+                    }
                     None => {
                         let val = "1";
                         unlock(storage).set(k, val.as_bytes());
@@ -210,6 +210,25 @@ fn run_command_and_get_response<T: Storage>(
             Command::Quit => protocol::OK.to_vec(),
             Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
             Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+            Command::Expire(k, v) => {
+                match unlock(storage).get(k.as_slice()) {
+                    Some(_) => {
+                        if let Ok(expiration) = std::str::from_utf8(value).unwrap().parse::<u64>() {
+                            let i = unlock(storage).expire(k.as_slice(), expiration.to_string().into_bytes().as_slice());
+                            if i == 1 {
+                                format!(":{}\r\n", "1").as_bytes().to_vec()
+                            } else {
+                                format!(":{}\r\n", "0").as_bytes().to_vec()
+                            }
+                        } else {
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}".to_vec()
+                        }
+                    }
+                    None => {
+                        format!(":{}\r\n", "0").as_bytes().to_vec()
+                    }
+                }
+            }
         },
         None => b"-ERR command not found\r\n".to_vec(),
     };
@@ -331,12 +350,12 @@ fn start_server<T: Storage + Send + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use redis::{Commands, RedisResult, cmd};
+    use redis::{cmd, Commands, RedisResult};
 
     use storage::in_memory::InMemoryStorage;
 
-    use crate::server::ServerState;
     use crate::Server;
+    use crate::server::ServerState;
 
     #[test]
     #[serial]

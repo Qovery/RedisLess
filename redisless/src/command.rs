@@ -11,6 +11,7 @@ pub enum Command {
     Get(Key),
     Del(Key),
     Incr(Key),
+    Expire(Key, Value),
     Info,
     Ping,
     Quit,
