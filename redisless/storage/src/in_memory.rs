@@ -48,7 +48,8 @@ impl Storage for InMemoryStorage {
                     }
                 }
             }
-            Err(_) => panic!("SystemTime before UNIX EPOCH!?")
+            // Shouldn't happen, if it happens it would mean SystemTime is before UNIX_EPOCH
+            Err(_) => None
         }
     }
 
@@ -75,10 +76,11 @@ impl Storage for InMemoryStorage {
                     self.expiration_store.insert(key.to_vec(), expiration.to_string().as_bytes().to_vec());
                     1
                 } else {
-                    panic!("Not u64?!")
+                    0
                 }
             }
-            Err(_) => panic!("SystemTime before UNIX EPOCH!?")
+            // Shouldn't happen, if it happens it would mean SystemTime is before UNIX_EPOCH
+            Err(_) => 0
         }
     }
 }
