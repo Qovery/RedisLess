@@ -42,6 +42,10 @@ impl Storage for InMemoryStorage {
         self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
+    fn expire(&mut self, key: &[u8], expiry: usize) {
+        self.string_store.entry(key.to_vec()).and_modify(|v| v.expiry = Some(expiry));
+    }
+
     fn setex(&mut self, key: &[u8], value: &[u8], expiry: usize) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
         self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), Some(expiry)));
