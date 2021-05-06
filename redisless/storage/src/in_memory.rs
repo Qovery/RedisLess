@@ -4,6 +4,7 @@ use crate::Storage;
 
 type Expiry = Option<usize>;
 
+#[derive(Debug, PartialEq)]
 pub struct RedisValue {
     pub data: Vec<u8>,
     expiry: Expiry,
