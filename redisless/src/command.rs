@@ -11,6 +11,7 @@ pub enum Command {
     Setex(Key, Value, u64),
     Expire(Key, u64),
     Get(Key),
+    GetSet(Key, Value),
     Del(Key),
     Incr(Key),
     Info,
@@ -98,6 +99,19 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'GET' command")
+                }
+                b"GETSET" | b"getset" | b"Getset" | b"GetSet" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'GETSET' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(value) = get_bytes_vec(v.get(2)) {
+                            return Command::GetSet(key, value);
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'SET' command")
                 }
                 b"DEL" | b"del" | b"Del" => {
                     if v.len() != 2 {
