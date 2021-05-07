@@ -48,14 +48,18 @@ impl Command {
                     if v.len() != 4 {
                         return Error("wrong number of arguments for 'SETEX' command");
                     }
-
                     if let Some(key) = get_bytes_vec(v.get(1)) {
-                        if let Some(value) = get_bytes_vec(v.get(2)) {
-                            if let Some(duration) = get_bytes_vec(v.get(3)) {
-                                if let Ok(duration) = bincode::deserialize::<u64>(&duration[..]) {
-                                    return Command::Setex(key, value, duration);
+                        // Redis sends value as index 3 and duration as index 2
+                        if let Some(value) = get_bytes_vec(v.get(3)) {
+                            if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                                if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                    if let Ok(duration) = duration_str.parse::<u64>() {
+                                        return Command::Setex(key, value, duration);
+                                    } else {
+                                        return Error("could not parse duration as u64");
+                                    }
                                 } else {
-                                    return Error("unable to parse duration as u64");
+                                    return Error("bad string in request");
                                 }
                             }
                         }
@@ -69,14 +73,19 @@ impl Command {
                     }
 
                     if let Some(key) = get_bytes_vec(v.get(1)) {
-                        if let Some(duration) = get_bytes_vec(v.get(3)) {
-                            if let Ok(duration) = bincode::deserialize::<u64>(&duration[..]) {
-                                return Command::Expire(key, duration);
+                        if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                            if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                if let Ok(duration) = duration_str.parse::<u64>() {
+                                    return Command::Expire(key, duration);
+                                } else {
+                                    return Error("could not parse duration as u64");
+                                }
                             } else {
-                                return Error("unable to parse duration as u64");
+                                return Error("bad string in request");
                             }
                         }
                     }
+
                     Error("wrong number of arguments for 'SETEX' command")
                 }
                 b"GET" | b"get" | b"Get" => {
