@@ -441,7 +441,25 @@ mod tests {
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
     }
-    
+
+    #[test]
+    #[serial]
+    fn getdel() {
+        let port = 3342;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let _: String = con.set("key", "value").unwrap();
+        let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
+
+        // Test hangs after this line !
+        // let x: Option<String> = con.get("key").ok();
+        // assert_eq!(x, None);
+    }
+
     #[test]
     #[serial]
     fn get_set() {
