@@ -414,7 +414,8 @@ mod tests {
         let _ = con
             .send_packed_command(
                 cmd("INCRBY")
-                    .arg(&["intkeyby", "10"])
+                    .arg("intkeyby")
+                    .arg(10)
                     .get_packed_command()
                     .as_slice(),
             )
@@ -426,7 +427,8 @@ mod tests {
         let _ = con
             .send_packed_command(
                 cmd("INCRBY")
-                    .arg(&["intkeyby", "-5"])
+                    .arg("intkeyby")
+                    .arg(-5)
                     .get_packed_command()
                     .as_slice(),
             )
