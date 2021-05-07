@@ -6,7 +6,6 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
-
 use storage::Storage;
 
 use crate::command::Command;
@@ -123,7 +122,7 @@ fn stop_sig_received(recv: &Receiver<ServerState>, sender: &Sender<ServerState>)
     false
 }
 
-fn unlock<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
+fn lock_then_release<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
     loop {
         match storage.lock() {
             Ok(storage) => {
@@ -171,18 +170,18 @@ fn run_command_and_get_response<T: Storage>(
     let response = match &command {
         Some(command) => match command {
             Command::Set(k, v) => {
-                unlock(storage).set(k.as_slice(), v.as_slice());
+                lock_then_release(storage).set(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
             Command::Setex(k, v, duration) => {
-                unlock(storage).setex(k.as_slice(), v.as_slice(), *duration);
+                lock_then_release(storage).setex(k.as_slice(), v.as_slice(), *duration);
                 protocol::OK.to_vec()
             }
             Command::Expire(k, duration) => {
-                unlock(storage).expire(k.as_slice(), *duration);
+                lock_then_release(storage).expire(k.as_slice(), *duration);
                 protocol::OK.to_vec()
             }
-            Command::Get(k) => match unlock(storage).get(k.as_slice()) {
+            Command::Get(k) => match lock_then_release(storage).get(k.as_slice()) {
                 Some(value) => {
                     let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                     res.as_bytes().to_vec()
@@ -190,11 +189,11 @@ fn run_command_and_get_response<T: Storage>(
                 None => protocol::NIL.to_vec(),
             },
             Command::Del(k) => {
-                let total_del = unlock(storage).del(k.as_slice());
+                let total_del = lock_then_release(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
             Command::Incr(k) => {
-                let mut storage = unlock(storage);
+                let mut storage = lock_then_release(storage);
 
                 match storage.get(k.as_slice()) {
                     Some(value) => {
@@ -346,7 +345,6 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use redis::{cmd, Commands, RedisResult};
-
     use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
@@ -390,6 +388,7 @@ mod tests {
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
+
     #[test]
     #[serial]
     fn setex_and_expire() {
@@ -414,9 +413,9 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        let ret_val: Result<u32, _> /*should be just u32*/= con.expire("key2", duration); // getting timeout here
+        let ret_val: u32 = con.expire("key2", duration).unwrap();
+        assert_eq!(ret_val, 1);
 
-        //assert_eq!(ret_val, 1);
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
