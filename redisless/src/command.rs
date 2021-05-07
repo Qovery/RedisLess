@@ -8,6 +8,8 @@ type Message = &'static str;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
+    Setex(Key, Value, u64),
+    Expire(Key, u64),
     Get(Key),
     Del(Key),
     Incr(Key),
@@ -34,13 +36,57 @@ impl Command {
                         return Error("wrong number of arguments for 'SET' command");
                     }
 
-                    if let Some(arg1) = get_bytes_vec(v.get(1)) {
-                        if let Some(arg2) = get_bytes_vec(v.get(2)) {
-                            return Command::Set(arg1, arg2);
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(value) = get_bytes_vec(v.get(2)) {
+                            return Command::Set(key, value);
                         }
                     }
 
                     Error("wrong number of arguments for 'SET' command")
+                }
+                b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
+                    if v.len() != 4 {
+                        return Error("wrong number of arguments for 'SETEX' command");
+                    }
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        // Redis sends value as index 3 and duration as index 2
+                        if let Some(value) = get_bytes_vec(v.get(3)) {
+                            if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                                if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                    if let Ok(duration) = duration_str.parse::<u64>() {
+                                        return Command::Setex(key, value, duration);
+                                    } else {
+                                        return Error("could not parse duration as u64");
+                                    }
+                                } else {
+                                    return Error("bad string in request");
+                                }
+                            }
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'SETEX' command")
+                }
+                b"EXPIRE" | b"expire" | b"Expire" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'EXPIRE' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                            if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                if let Ok(duration) = duration_str.parse::<u64>() {
+                                    return Command::Expire(key, duration);
+                                } else {
+                                    return Error("could not parse duration as u64");
+                                }
+                            } else {
+                                return Error("bad string in request");
+                            }
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'EXPIRE' command")
                 }
                 b"GET" | b"get" | b"Get" => {
                     if v.len() != 2 {
