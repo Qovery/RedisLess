@@ -216,6 +216,30 @@ fn run_command_and_get_response<T: Storage>(
                     }
                 }
             }
+            Command::IncrBy(k, increment) => {
+                let mut storage = lock_then_release(storage);
+
+                match storage.get(k.as_slice()) {
+                    Some(value) => {
+                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
+                        {
+                            int_val += increment;
+                            let new_value = int_val.to_string().into_bytes();
+                            storage.set(k.as_slice(), new_value.as_slice());
+
+                            format!(":{}\r\n", int_val).as_bytes().to_vec()
+                        } else {
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                                .to_vec()
+                        }
+                    }
+                    None => {
+                        let val = increment.to_string().into_bytes();
+                        storage.set(k, val.as_slice());
+                        format!(":{}\r\n", increment).as_bytes().to_vec()
+                    }
+                }
+            }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
             Command::Quit => protocol::OK.to_vec(),
@@ -385,6 +409,31 @@ mod tests {
 
         let x: u32 = con.get("intkey").unwrap();
         assert_eq!(x, 11u32);
+
+        let _: () = con.set("intkeyby", "10").unwrap();
+        let _ = con
+            .send_packed_command(
+                cmd("INCRBY")
+                    .arg(&["intkeyby", "10"])
+                    .get_packed_command()
+                    .as_slice(),
+            )
+            .unwrap();
+
+        let x: u32 = con.get("intkeyby").unwrap();
+        assert_eq!(x, 20u32);
+
+        let _ = con
+            .send_packed_command(
+                cmd("INCRBY")
+                    .arg(&["intkeyby", "-5"])
+                    .get_packed_command()
+                    .as_slice(),
+            )
+            .unwrap();
+
+        let x: u32 = con.get("intkeyby").unwrap();
+        assert_eq!(x, 15u32);
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }

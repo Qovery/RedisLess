@@ -13,6 +13,7 @@ pub enum Command {
     Get(Key),
     Del(Key),
     Incr(Key),
+    IncrBy(Key, i64),
     Info,
     Ping,
     Quit,
@@ -120,6 +121,27 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'INCR' command")
+                }
+                b"INCRBY" | b"incrby" | b"IncrBy" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'INCRBY' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(increment_bytes) = get_bytes_vec(v.get(2)) {
+                            if let Ok(increment_str) = std::str::from_utf8(&increment_bytes[..]) {
+                                if let Ok(increment) = increment_str.parse::<i64>() {
+                                    return Command::IncrBy(key, increment);
+                                } else {
+                                    return Error("could not parse duration as i64");
+                                }
+                            } else {
+                                return Error("bad string in request");
+                            }
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'INCRBY' command")
                 }
                 b"INFO" | b"info" | b"Info" => Command::Info,
                 b"PING" | b"ping" | b"Ping" => Command::Ping,
