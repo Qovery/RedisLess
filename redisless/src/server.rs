@@ -205,6 +205,14 @@ fn run_command_and_get_response<T: Storage>(
                 let total_del = lock_then_release(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
+            Command::GetDel(k) => match lock_then_release(storage).get(k.as_slice()) {
+                Some(value) => {
+                    let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                    let _ = lock_then_release(storage).del(k.as_slice());
+                    res.as_bytes().to_vec()
+                }
+                None => protocol::NIL.to_vec(),
+            },
             Command::Incr(k) => {
                 let mut storage = lock_then_release(storage);
 
