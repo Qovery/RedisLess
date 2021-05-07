@@ -435,7 +435,7 @@ mod tests {
     #[test]
     #[serial]
     fn get_set() {
-        let port = 3334;
+        let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
