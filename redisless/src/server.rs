@@ -338,7 +338,9 @@ fn start_server<T: Storage + Send + 'static>(
 #[cfg(test)]
 mod tests {
     use std::{thread::sleep, time::Duration};
+
     use redis::{cmd, Commands, RedisResult};
+
     use crate::server::ServerState;
     use crate::storage::in_memory::InMemoryStorage;
     use crate::Server;
@@ -379,6 +381,7 @@ mod tests {
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
+
     #[test]
     #[serial]
     fn setex_and_expire() {
@@ -403,8 +406,8 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        let ret_val: Result<u32, _> /*should be just u32*/= con.expire("key2", duration); // getting timeout here
-        //println!("{:?}", ret_val);
+        let ret_val: Result<u32, _> /*should be just u32*/ = con.expire("key2", duration); // getting timeout here
+                                                                                           //println!("{:?}", ret_val);
 
         //assert_eq!(ret_val, 1);
         sleep(Duration::from_secs(duration as u64));
