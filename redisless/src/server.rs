@@ -205,7 +205,7 @@ fn run_command_and_get_response<T: Storage>(
 
                             format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
-                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value"
                                 .to_vec()
                         }
                     }
@@ -229,7 +229,7 @@ fn run_command_and_get_response<T: Storage>(
 
                             format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
-                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value"
                                 .to_vec()
                         }
                     }
