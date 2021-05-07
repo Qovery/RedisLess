@@ -6,11 +6,11 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
-use storage::Storage;
 
 use crate::command::Command;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, RESP};
+use crate::storage::Storage;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -345,9 +345,9 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use redis::{cmd, Commands, RedisResult};
-    use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
+    use crate::storage::in_memory::InMemoryStorage;
     use crate::Server;
 
     #[test]
