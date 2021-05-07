@@ -86,7 +86,7 @@ impl Command {
                         }
                     }
 
-                    Error("wrong number of arguments for 'SETEX' command")
+                    Error("wrong number of arguments for 'EXPIRE' command")
                 }
                 b"GET" | b"get" | b"Get" => {
                     if v.len() != 2 {
