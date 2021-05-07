@@ -12,6 +12,7 @@ pub enum Command {
     Expire(Key, u64),
     Get(Key),
     Del(Key),
+    GetDel(Key),
     Incr(Key),
     Info,
     Ping,
@@ -109,6 +110,17 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'DEL' command")
+                }
+                b"GETDEL" | b"getdel" | b"GetDel" | b"Getdel" => {
+                    if v.len() != 2 {
+                        return Error("wrong number of arguments for 'GET' command");
+                    }
+
+                    if let Some(arg1) = get_bytes_vec(v.get(1)) {
+                        return Command::GetDel(arg1);
+                    }
+
+                    Error("wrong number of arguments for 'GET' command")
                 }
                 b"INCR" | b"incr" | b"Incr" => {
                     if v.len() != 2 {
