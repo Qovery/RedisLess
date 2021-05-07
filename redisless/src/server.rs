@@ -193,25 +193,30 @@ fn run_command_and_get_response<T: Storage>(
                 let total_del = unlock(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
-            Command::Incr(k) => match unlock(storage).get(k.as_slice()) {
-                Some(value) => {
-                    if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>() {
-                        int_val += 1;
-                        let new_value = int_val.to_string().into_bytes();
-                        unlock(storage).set(k.as_slice(), new_value.as_slice());
+            Command::Incr(k) => {
+                let mut storage = unlock(storage);
 
-                        format!(":{}\r\n", int_val).as_bytes().to_vec()
-                    } else {
-                        b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
-                            .to_vec()
+                match storage.get(k.as_slice()) {
+                    Some(value) => {
+                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
+                        {
+                            int_val += 1;
+                            let new_value = int_val.to_string().into_bytes();
+                            storage.set(k.as_slice(), new_value.as_slice());
+
+                            format!(":{}\r\n", int_val).as_bytes().to_vec()
+                        } else {
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                                .to_vec()
+                        }
+                    }
+                    None => {
+                        let val = "1";
+                        storage.set(k, val.as_bytes());
+                        format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
-                None => {
-                    let val = "1";
-                    unlock(storage).set(k, val.as_bytes());
-                    format!(":{}\r\n", val).as_bytes().to_vec()
-                }
-            },
+            }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
             Command::Quit => protocol::OK.to_vec(),
@@ -350,7 +355,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_redis_implementation() {
-        let port = 16379;
+        let port = 3336;
         let server = Server::new(InMemoryStorage::new(), port);
 
         assert_eq!(server.start(), Some(ServerState::Started)); // this fails
@@ -376,22 +381,24 @@ mod tests {
         assert_eq!(x, "value2");
 
         let _: () = con.set("intkey", "10").unwrap();
-        con.send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice())
+        let _ = con
+            .send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice())
             .unwrap();
-        let x: String = con.get("intkey").unwrap();
-        assert_eq!(x, "11");
+
+        let x: u32 = con.get("intkey").unwrap();
+        assert_eq!(x, 11u32);
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
     #[test]
     #[serial]
     fn setex_and_expire() {
-        let port = 16379;
+        let port = 3335;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-        let mut con = redis_client.get_connection().unwrap(); 
+        let mut con = redis_client.get_connection().unwrap();
 
         let duration: usize = 2;
         let _: () = con.set_ex("key", "value", duration).unwrap();
@@ -408,7 +415,6 @@ mod tests {
         assert_eq!(x, "value2");
 
         let ret_val: Result<u32, _> /*should be just u32*/= con.expire("key2", duration); // getting timeout here
-        //println!("{:?}", ret_val);
 
         //assert_eq!(ret_val, 1);
         sleep(Duration::from_secs(duration as u64));
