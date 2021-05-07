@@ -455,9 +455,10 @@ mod tests {
         let _: String = con.set("key", "value").unwrap();
         let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
 
-        // Test hangs after this line !
+        // Test would hang after requesting with send_packed_command !
         // let x: Option<String> = con.get("key").ok();
         // assert_eq!(x, None);
+        assert_eq!(1, 2); // intentional fail
     }
 
     #[test]
