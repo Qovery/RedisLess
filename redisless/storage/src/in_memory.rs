@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use crate::Storage;
 
@@ -16,6 +19,7 @@ impl Expiry {
         }
     }
 }
+
 #[derive(Debug, PartialEq)]
 pub struct RedisValue {
     pub data: Vec<u8>,
@@ -30,7 +34,7 @@ impl RedisValue {
     pub fn is_expired(&self) -> bool {
         if let Some(expiry) = &self.expiry {
             if expiry.timestamp.elapsed() >= Duration::from_secs(expiry.duration) {
-                return true
+                return true;
             }
         }
         false
@@ -61,25 +65,29 @@ impl InMemoryStorage {
 impl Storage for InMemoryStorage {
     fn set(&mut self, key: &[u8], value: &[u8]) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
+        self.string_store
+            .insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
     fn expire(&mut self, key: &[u8], duration: u64) -> u32 {
         if let Some(value) = self.string_store.get_mut(key) {
             value.expiry = Some(Expiry::new(duration));
-            1
+            1 // timeout was set
         } else {
-            0
+            0 // key does not exist
         }
     }
 
     fn setex(&mut self, key: &[u8], value: &[u8], duration: u64) {
         self.data_mapper.insert(key.to_vec(), DataType::String);
-        self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), Some(Expiry::new(duration))));
+        self.string_store.insert(
+            key.to_vec(),
+            RedisValue::new(value.to_vec(), Some(Expiry::new(duration))),
+        );
     }
 
     fn get(&mut self, key: &[u8]) -> Option<&[u8]> {
-        if let Some(value ) = self.string_store.get(key) {
+        if let Some(value) = self.string_store.get(key) {
             match value.is_expired() {
                 true => {
                     self.del(key);
