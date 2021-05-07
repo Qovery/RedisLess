@@ -353,7 +353,7 @@ mod tests {
         let port = 16379;
         let server = Server::new(InMemoryStorage::new(), port);
 
-        assert_eq!(server.start(), Some(ServerState::Started));
+        assert_eq!(server.start(), Some(ServerState::Started)); // this fails
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
@@ -388,10 +388,10 @@ mod tests {
     fn setex_and_expire() {
         let port = 16379;
         let server = Server::new(InMemoryStorage::new(), port);
-        assert_eq!(server.start(), Some(ServerState::Started));
+        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-        let mut con = redis_client.get_connection().unwrap();
+        let mut con = redis_client.get_connection().unwrap(); 
 
         let duration: usize = 2;
         let _: () = con.set_ex("key", "value", duration).unwrap();
@@ -407,8 +407,8 @@ mod tests {
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        let ret_val: Result<u32, _> = con.expire("key2", duration); // getting timeout here
-        println!("{:?}", ret_val);
+        let ret_val: Result<u32, _> /*should be just u32*/= con.expire("key2", duration); // getting timeout here
+        //println!("{:?}", ret_val);
 
         //assert_eq!(ret_val, 1);
         sleep(Duration::from_secs(duration as u64));
