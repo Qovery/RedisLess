@@ -64,10 +64,13 @@ impl Storage for InMemoryStorage {
         self.string_store.insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
-    fn expire(&mut self, key: &[u8], duration: u64) {
-        self.string_store.entry(key.to_vec()).and_modify(|v| {
-            v.expiry = Some(Expiry::new(duration))
-        });
+    fn expire(&mut self, key: &[u8], duration: u64) -> u32 {
+        if let Some(value) = self.string_store.get_mut(key) {
+            value.expiry = Some(Expiry::new(duration));
+            1
+        } else {
+            0
+        }
     }
 
     fn setex(&mut self, key: &[u8], value: &[u8], duration: u64) {
