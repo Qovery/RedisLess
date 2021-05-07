@@ -178,8 +178,8 @@ fn run_command_and_get_response<T: Storage>(
                 protocol::OK.to_vec()
             }
             Command::Expire(k, duration) => {
-                lock_then_release(storage).expire(k.as_slice(), *duration);
-                protocol::OK.to_vec()
+                let v = lock_then_release(storage).expire(k.as_slice(), *duration);
+                format!(":{}\r\n", v).as_bytes().to_vec()
             }
             Command::Get(k) => match lock_then_release(storage).get(k.as_slice()) {
                 Some(value) => {
