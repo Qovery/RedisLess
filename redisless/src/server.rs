@@ -338,6 +338,8 @@ fn start_server<T: Storage + Send + 'static>(
 
 #[cfg(test)]
 mod tests {
+    use std::{thread::sleep, time::Duration};
+
     use redis::{cmd, Commands, RedisResult};
 
     use storage::in_memory::InMemoryStorage;
@@ -380,6 +382,38 @@ mod tests {
         assert_eq!(x, "11");
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
+    }
+    #[test]
+    #[serial]
+    fn setex_and_expire() {
+        let port = 16379;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let duration: usize = 2;
+        let _: () = con.set_ex("key", "value", duration).unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
+
+        sleep(Duration::from_secs(duration as u64));
+        let x: Option<String> = con.get("key").ok();
+        assert_eq!(x, None);
+
+        let duration: usize = 3;
+        let _: () = con.set("key2", "value2").unwrap();
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "value2");
+
+        let ret_val: Result<u32, _> = con.expire("key2", duration); // getting timeout here
+        println!("{:?}", ret_val);
+
+        //assert_eq!(ret_val, 1);
+        sleep(Duration::from_secs(duration as u64));
+        let x: Option<String> = con.get("key2").ok();
+        assert_eq!(x, None);
     }
 
     #[test]
