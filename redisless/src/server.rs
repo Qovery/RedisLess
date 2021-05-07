@@ -428,7 +428,7 @@ mod tests {
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
     }
-
+    
     #[test]
     #[serial]
     fn start_and_stop_server() {

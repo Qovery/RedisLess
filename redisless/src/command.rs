@@ -113,14 +113,14 @@ impl Command {
                 }
                 b"GETDEL" | b"getdel" | b"GetDel" | b"Getdel" => {
                     if v.len() != 2 {
-                        return Error("wrong number of arguments for 'GET' command");
+                        return Error("wrong number of arguments for 'GETDEL' command");
                     }
 
                     if let Some(arg1) = get_bytes_vec(v.get(1)) {
                         return Command::GetDel(arg1);
                     }
 
-                    Error("wrong number of arguments for 'GET' command")
+                    Error("wrong number of arguments for 'GETDEL' command")
                 }
                 b"INCR" | b"incr" | b"Incr" => {
                     if v.len() != 2 {
