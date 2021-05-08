@@ -189,14 +189,16 @@ fn run_command_and_get_response<T: Storage>(
                 None => protocol::NIL.to_vec(),
             },
             Command::GetSet(k, v) => {
-                let response = match lock_then_release(storage).get(k.as_slice()) {
+                let mut storage_lock = lock_then_release(storage);
+
+                let response = match storage_lock.get(k.as_slice()) {
                     Some(value) => {
                         let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                         res.as_bytes().to_vec()
                     }
                     None => protocol::NIL.to_vec(),
                 };
-                lock_then_release(storage).set(k.as_slice(), v.as_slice());
+                storage_lock.set(k.as_slice(), v.as_slice());
                 response
             }
             Command::Del(k) => {
