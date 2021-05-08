@@ -1,5 +1,5 @@
 use crate::command::Command::{Error, NotSupported};
-use crate::protocol::RESP;
+use crate::protocol::Resp;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -21,17 +21,17 @@ pub enum Command {
     NotSupported(String),
 }
 
-fn get_bytes_vec(resp: Option<&RESP>) -> Option<Vec<u8>> {
+fn get_bytes_vec(resp: Option<&Resp>) -> Option<Vec<u8>> {
     match resp {
-        Some(RESP::String(x)) | Some(RESP::BulkString(x)) => Some(x.to_vec()),
+        Some(Resp::String(x)) | Some(Resp::BulkString(x)) => Some(x.to_vec()),
         _ => None,
     }
 }
 
 impl Command {
-    pub fn parse(v: Vec<RESP>) -> Self {
+    pub fn parse(v: Vec<Resp>) -> Self {
         match v.first() {
-            Some(RESP::BulkString(op)) => match *op {
+            Some(Resp::BulkString(op)) => match *op {
                 b"SET" | b"set" | b"Set" => {
                     if v.len() != 3 {
                         return Error("wrong number of arguments for 'SET' command");
@@ -151,7 +151,7 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use crate::command::Command;
-    use crate::protocol::RESP;
+    use crate::protocol::Resp;
 
     #[test]
     fn set_command() {
@@ -159,9 +159,9 @@ mod tests {
 
         for cmd in commands {
             let resp = vec![
-                RESP::BulkString(cmd),
-                RESP::BulkString(b"mykey"),
-                RESP::BulkString(b"value"),
+                Resp::BulkString(cmd),
+                Resp::BulkString(b"mykey"),
+                Resp::BulkString(b"value"),
             ];
 
             let command = Command::parse(resp);

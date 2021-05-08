@@ -10,7 +10,7 @@ use storage::Storage;
 
 use crate::command::Command;
 use crate::protocol;
-use crate::protocol::{RedisProtocolParser, RESP};
+use crate::protocol::{RedisProtocolParser, Resp};
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -154,7 +154,7 @@ fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
 fn get_command(bytes: &[u8; 512]) -> Option<Command> {
     match RedisProtocolParser::parse(bytes) {
         Ok((resp, _)) => match resp {
-            RESP::Array(x) => Some(Command::parse(x)),
+            Resp::Array(x) => Some(Command::parse(x)),
             _ => None,
         },
         _ => None,
