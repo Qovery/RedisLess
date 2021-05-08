@@ -170,18 +170,22 @@ fn run_command_and_get_response<T: Storage>(
     let response = match &command {
         Some(command) => match command {
             Command::Set(k, v) => {
-                lock_then_release(storage).set(k.as_slice(), v.as_slice());
+                lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
             Command::Setex(k, v, duration) => {
-                lock_then_release(storage).setex(k.as_slice(), v.as_slice(), *duration);
+                let mut storage = lock_then_release(storage);
+
+                storage.write(k.as_slice(), v.as_slice());
+                storage.expire(k.as_slice(), *duration);
+
                 protocol::OK.to_vec()
             }
             Command::Expire(k, duration) => {
                 let v = lock_then_release(storage).expire(k.as_slice(), *duration);
                 format!(":{}\r\n", v).as_bytes().to_vec()
             }
-            Command::Get(k) => match lock_then_release(storage).get(k.as_slice()) {
+            Command::Get(k) => match lock_then_release(storage).read(k.as_slice()) {
                 Some(value) => {
                     let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                     res.as_bytes().to_vec()
@@ -191,30 +195,30 @@ fn run_command_and_get_response<T: Storage>(
             Command::GetSet(k, v) => {
                 let mut storage_lock = lock_then_release(storage);
 
-                let response = match storage_lock.get(k.as_slice()) {
+                let response = match storage_lock.read(k.as_slice()) {
                     Some(value) => {
                         let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                         res.as_bytes().to_vec()
                     }
                     None => protocol::NIL.to_vec(),
                 };
-                storage_lock.set(k.as_slice(), v.as_slice());
+                storage_lock.write(k.as_slice(), v.as_slice());
                 response
             }
             Command::Del(k) => {
-                let total_del = lock_then_release(storage).del(k.as_slice());
+                let total_del = lock_then_release(storage).remove(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
             Command::Incr(k) => {
                 let mut storage = lock_then_release(storage);
 
-                match storage.get(k.as_slice()) {
+                match storage.read(k.as_slice()) {
                     Some(value) => {
                         if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
                         {
                             int_val += 1;
                             let new_value = int_val.to_string().into_bytes();
-                            storage.set(k.as_slice(), new_value.as_slice());
+                            storage.write(k.as_slice(), new_value.as_slice());
 
                             format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
@@ -224,7 +228,7 @@ fn run_command_and_get_response<T: Storage>(
                     }
                     None => {
                         let val = "1";
-                        storage.set(k, val.as_bytes());
+                        storage.write(k, val.as_bytes());
                         format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
