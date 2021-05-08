@@ -316,14 +316,11 @@ fn start_server<T: Storage + Send + 'static>(
                             return;
                         }
 
-                        match last_update.duration_since(SystemTime::now()) {
-                            Ok(duration) => {
-                                if duration.as_secs() >= 300 {
-                                    // close the connection after 300 secs of inactivity
-                                    return;
-                                }
+                        if let Ok(duration) = last_update.duration_since(SystemTime::now()) {
+                            if duration.as_secs() >= 300 {
+                                // close the connection after 300 secs of inactivity
+                                return;
                             }
-                            Err(_) => {}
                         }
 
                         if close_connection {
