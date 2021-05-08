@@ -83,16 +83,9 @@ impl Server {
         // wait for changing state
         let receiver = self.server_state_bus.receiver(); // TODO cache receiver to reuse it?
 
-        loop {
-            match receiver.recv_timeout(Duration::from_secs(5)) {
-                Ok(server_state) => {
-                    if server_state == post_change_to_state {
-                        return Some(server_state);
-                    }
-                }
-                Err(_) => {
-                    break;
-                }
+        while let Ok(server_state) = receiver.recv_timeout(Duration::from_secs(5)) {
+            if server_state == post_change_to_state {
+                return Some(server_state);
             }
         }
 
