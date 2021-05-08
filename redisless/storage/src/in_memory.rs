@@ -118,31 +118,21 @@ mod tests {
     #[test]
     fn test_in_memory_storage() {
         let mut mem = InMemoryStorage::new();
-        mem.set(b"key", b"xxx");
-        assert_eq!(mem.get(b"key"), Some(&b"xxx"[..]));
-        assert_eq!(mem.del(b"key"), 1);
-        assert_eq!(mem.del(b"key"), 0);
-        assert_eq!(mem.get(b"does not exist"), None);
-    }
-
-    #[test]
-    fn test_setex() {
-        let mut mem = InMemoryStorage::new();
-        let duration: u64 = 4;
-        mem.setex(b"key", b"xxx", 4);
-        assert_eq!(mem.get(b"key"), Some(&b"xxx"[..]));
-        sleep(Duration::from_secs(duration));
-        assert_eq!(mem.get(b"xxx"), None);
+        mem.write(b"key", b"xxx");
+        assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
+        assert_eq!(mem.remove(b"key"), 1);
+        assert_eq!(mem.remove(b"key"), 0);
+        assert_eq!(mem.read(b"does not exist"), None);
     }
 
     #[test]
     fn test_expire() {
         let mut mem = InMemoryStorage::new();
         let duration: u64 = 4;
-        mem.set(b"key", b"xxx");
+        mem.write(b"key", b"xxx");
         mem.expire(b"key", duration);
-        assert_eq!(mem.get(b"key"), Some(&b"xxx"[..]));
+        assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
         sleep(Duration::from_secs(duration));
-        assert_eq!(mem.get(b"key"), None);
+        assert_eq!(mem.read(b"key"), None);
     }
 }
