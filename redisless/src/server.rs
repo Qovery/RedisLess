@@ -11,6 +11,8 @@ use storage::Storage;
 use crate::command::Command;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, RESP};
+use std::convert::TryInto;
+use std::borrow::Borrow;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -221,6 +223,10 @@ fn run_command_and_get_response<T: Storage>(
             Command::Quit => protocol::OK.to_vec(),
             Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
             Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+            Command::TTL(k) => {
+                let ttl = lock_then_release(storage).ttl(k.as_slice());
+                format!(":{}\r\n", ttl.to_string()).as_bytes().to_vec()
+            }
         },
         None => b"-ERR command not found\r\n".to_vec(),
     };
@@ -349,6 +355,7 @@ mod tests {
 
     use crate::server::ServerState;
     use crate::Server;
+    use std::ops::Sub;
 
     #[test]
     #[serial]
@@ -419,6 +426,37 @@ mod tests {
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
+    }
+
+    #[test]
+    #[serial]
+    fn expire_ttl() {
+        let port = 3335;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let duration: usize = 2;
+        let _: () = con.set_ex("key", "value", duration).unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
+
+        // return duration 1 second less after one second
+        sleep(Duration::from_secs(1));
+        let ttl1: usize = con.ttl("key").unwrap();
+        assert_eq!(duration.sub(1), ttl1);
+
+        // return -2 after key expired (key doesn't exists)
+        sleep(Duration::from_secs(duration as u64));
+        let ttl2: i64 = con.ttl("key").unwrap();
+        assert_eq!(-2, ttl2);
+
+        // return -1 when key exists, but without expiration
+        let _: () = con.set("key", "value").unwrap();
+        let ttl3: i64 = con.ttl("key").unwrap();
+        assert_eq!(-1, ttl3);
     }
 
     #[test]
