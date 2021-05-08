@@ -17,28 +17,26 @@ where
     X: Clone + Send + Sync + 'static,
 {
     pub fn new() -> Self {
-        let (tx, rx) = unbounded::<X>();
+        let (sender, receiver) = unbounded::<X>();
 
         let mpb = MPB {
-            sender: tx,
+            sender,
             internal_senders: Arc::new(Mutex::new(vec![])),
         };
 
-        mpb._init(rx);
+        mpb._init(receiver);
 
         mpb
     }
 
-    fn _init(&self, rx: Receiver<X>) {
+    fn _init(&self, receiver: Receiver<X>) {
         let internal_senders = self.internal_senders.clone();
 
         let _ = thread::spawn(move || {
-            let senders = internal_senders;
-
-            for msg in rx {
-                match senders.lock() {
-                    Ok(s) => {
-                        for sender in s.iter() {
+            for msg in receiver {
+                match internal_senders.lock() {
+                    Ok(senders) => {
+                        for sender in senders.iter() {
                             let _ = sender.send(msg.clone());
                         }
                     }
@@ -48,21 +46,21 @@ where
         });
     }
 
-    pub fn tx(&self) -> Sender<X> {
+    pub fn sender(&self) -> Sender<X> {
         self.sender.clone()
     }
 
-    pub fn rx(&self) -> Receiver<X> {
-        let (_tx, rx) = unbounded();
+    pub fn receiver(&self) -> Receiver<X> {
+        let (sender, receiver) = unbounded();
 
         match self.internal_senders.lock() {
             Ok(mut s) => {
-                s.push(_tx);
+                s.push(sender);
             }
-            _ => {} // TODO manage deadlock
+            Err(_) => {} // TODO manage deadlock
         }
 
-        rx
+        receiver
     }
 }
 
@@ -76,26 +74,26 @@ mod tests {
     fn test_1() {
         let mpb = MPB::new();
 
-        let tx1 = mpb.tx();
-        let tx2 = mpb.tx();
+        let sender1 = mpb.sender();
+        let sender2 = mpb.sender();
 
-        let rx1 = mpb.rx();
-        let rx2 = mpb.rx();
+        let receiver1 = mpb.receiver();
+        let receiver2 = mpb.receiver();
 
         let j1 = thread::spawn(move || {
-            for rx in rx1.recv() {
-                assert_eq!(rx, "hello");
+            for receive in receiver1.recv() {
+                assert_eq!(receive, "hello");
             }
         });
 
         let j2 = thread::spawn(move || {
-            for rx in rx2.recv() {
-                assert_eq!(rx, "hello");
+            for receive in receiver2.recv() {
+                assert_eq!(receive, "hello");
             }
         });
 
-        let _ = tx1.send("hello");
-        let _ = tx2.send("hello");
+        let _ = sender1.send("hello");
+        let _ = sender2.send("hello");
 
         let _ = j1.join();
         let _ = j2.join();

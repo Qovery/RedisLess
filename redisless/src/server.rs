@@ -46,8 +46,8 @@ impl Server {
         storage: T,
     ) {
         let addr = addr.into();
-        let state_send = self.server_state_bus.tx();
-        let state_recv = self.server_state_bus.rx();
+        let state_send = self.server_state_bus.sender();
+        let state_recv = self.server_state_bus.receiver();
 
         let _ = thread::spawn(move || {
             let addr = addr;
@@ -64,7 +64,7 @@ impl Server {
     }
 
     fn change_state(&self, change_to: ServerState) -> Option<ServerState> {
-        let send_state_ch = self.server_state_bus.tx();
+        let send_state_ch = self.server_state_bus.sender();
 
         let post_change_to_state = match change_to {
             ServerState::Start => ServerState::Started,
@@ -81,10 +81,10 @@ impl Server {
         });
 
         // wait for changing state
-        let rx = self.server_state_bus.rx(); // TODO cache rx to reuse it?
+        let receiver = self.server_state_bus.receiver(); // TODO cache receiver to reuse it?
 
         loop {
-            match rx.recv_timeout(Duration::from_secs(5)) {
+            match receiver.recv_timeout(Duration::from_secs(5)) {
                 Ok(server_state) => {
                     if server_state == post_change_to_state {
                         return Some(server_state);
