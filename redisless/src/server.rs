@@ -259,7 +259,7 @@ fn handle_request<T: Storage>(
 }
 
 fn start_server<T: Storage + Send + 'static>(
-    addr: &String,
+    addr: &str,
     state_send: &Sender<ServerState>,
     state_recv: &Receiver<ServerState>,
     storage: &Arc<Mutex<T>>,
