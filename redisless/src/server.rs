@@ -131,7 +131,7 @@ fn lock_then_release<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
 fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
     let mut buf_reader = BufReader::new(stream);
     let mut buf = [0; 512];
-    let mut buf_length = 0 as usize;
+    let mut buf_length = 0_usize;
 
     while let Ok(s) = buf_reader.read(&mut buf) {
         buf_length += s;
@@ -146,10 +146,7 @@ fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
 
 fn get_command(bytes: &[u8; 512]) -> Option<Command> {
     match RedisProtocolParser::parse(bytes) {
-        Ok((resp, _)) => match resp {
-            Resp::Array(x) => Some(Command::parse(x)),
-            _ => None,
-        },
+        Ok((Resp::Array(x), _)) => Some(Command::parse(x)),
         _ => None,
     }
 }
