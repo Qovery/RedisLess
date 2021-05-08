@@ -7,7 +7,8 @@
 - [x] `del`
 - [x] `ping`
 - [x] `info`
-- [ ] `incr`
+- [x] `incr`
+- [x] `getset`
 - [ ] `incrby`
 - [ ] `decr`
 - [ ] `decrby`
