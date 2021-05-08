@@ -4,6 +4,8 @@ use std::{
 };
 
 use crate::Storage;
+use std::ops::Sub;
+use std::convert::TryInto;
 
 #[derive(Debug, PartialEq)]
 pub struct Expiry {
@@ -38,6 +40,18 @@ impl RedisValue {
             }
         }
         false
+    }
+
+    pub fn to_expire(&self) -> Option<u64> {
+        return if let Some(expiry) = &self.expiry {
+            if let Some(to_expire) = expiry.duration.checked_sub(expiry.timestamp.elapsed().as_secs()) {
+                Some(to_expire)
+            } else {
+                Some(0)
+            }
+        } else {
+            None
+        };
     }
 }
 
@@ -92,6 +106,26 @@ impl Storage for InMemoryStorage {
         }
     }
 
+    fn ttl(&mut self, key: &[u8]) -> i64 {
+        if let Some(value) = self.string_store.get(key) {
+            if let Some(expiry) = value.to_expire() {
+                if expiry == 0 {
+                    // key shouldn't exist as it's expired
+                    self.remove(key);
+                    return -2
+                }
+                // key not expired yet
+                expiry.try_into().unwrap()
+            } else {
+                // key without expiration
+                -1
+            }
+        } else {
+            // key doesn't exist
+            -2
+        }
+    }
+
     fn remove(&mut self, key: &[u8]) -> u32 {
         match self.data_mapper.get(key) {
             Some(data_type) => match data_type {
@@ -134,5 +168,31 @@ mod tests {
         assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
         sleep(Duration::from_secs(duration));
         assert_eq!(mem.read(b"key"), None);
+    }
+
+    #[test]
+    fn test_ttl() {
+        let mut mem = InMemoryStorage::new();
+        let duration: u64 = 4;
+        mem.write(b"key", b"xxx");
+        mem.expire(b"key", duration);
+
+        let ttl1 = mem.ttl(b"key");
+        assert_eq!(4, ttl1);
+
+        // sleep 1s, return ttl equal 4-1 -> 3
+        sleep(Duration::from_secs(1));
+        let ttl2 = mem.ttl(b"key");
+        assert_eq!(3, ttl2);
+
+        sleep(Duration::from_secs(4));
+        let ttl3 = mem.ttl(b"key");
+        // key no longer exists
+        assert_eq!(-2, ttl3);
+
+        // key exists, but has no expiration
+        mem.write(b"key_no_ttl", b"xxx");
+        let ttl4 = mem.ttl(b"key_no_ttl");
+        assert_eq!(-1, ttl4);
     }
 }

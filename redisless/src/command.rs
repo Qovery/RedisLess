@@ -10,6 +10,7 @@ pub enum Command {
     Set(Key, Value),
     Setex(Key, Value, u64),
     Expire(Key, u64),
+    TTL(Key),
     Get(Key),
     GetSet(Key, Value),
     Del(Key),
@@ -112,6 +113,17 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'SET' command")
+                }
+                b"TTL" | b"Ttl" | b"tll" => {
+                    if v.len() != 2 {
+                        return Error("wrong number of arguments for 'TTL' command");
+                    }
+
+                    if let Some(arg1) = get_bytes_vec(v.get(1)) {
+                        return Command::TTL(arg1);
+                    }
+
+                    Error("wrong number of arguments for 'TTL' command")
                 }
                 b"DEL" | b"del" | b"Del" => {
                     if v.len() != 2 {
