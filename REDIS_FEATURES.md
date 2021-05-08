@@ -9,6 +9,8 @@
 - [x] `info`
 - [x] `incr`
 - [x] `getset`
+- [x] `expire`
+- [x] `ttl`
 - [ ] `incrby`
 - [ ] `decr`
 - [ ] `decrby`
