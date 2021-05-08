@@ -192,13 +192,16 @@ fn run_command_and_get_response<T: Storage>(
                 let total_del = lock_then_release(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
-            Command::GetDel(k) => match lock_then_release(storage).get(k.as_slice()) {
-                Some(value) => {
-                    let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                    let _ = lock_then_release(storage).del(k.as_slice());
-                    res.as_bytes().to_vec()
+            Command::GetDel(k) => {
+                let mut storage_lock = lock_then_release(storage);
+                match storage_lock.get(k.as_slice()) {
+                    Some(value) => {
+                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                        let _ = storage_lock.del(k.as_slice());
+                        res.as_bytes().to_vec()
+                    }
+                    None => protocol::NIL.to_vec(),
                 }
-                None => protocol::NIL.to_vec(),
             },
             Command::Incr(k) => {
                 let mut storage = lock_then_release(storage);
@@ -440,12 +443,18 @@ mod tests {
         let mut con = redis_client.get_connection().unwrap();
 
         let _: String = con.set("key", "value").unwrap();
-        let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
+        
 
-        // Test would hang after requesting with send_packed_command !
-        // let x: Option<String> = con.get("key").ok();
-        // assert_eq!(x, None);
-        assert_eq!(1, 2); // intentional fail
+        // Changing the body of the match for GET to the same one for GETDEL 
+        // and then calling con.get, emulating a getdel, makes it work as you would expect
+        // But for some reason, it doesnt work with con.send_packed_command
+        // The value only gets deleted after having called with another con.get
+
+        let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
+        let _: Option<String> = con.get("key").ok(); // works after calling con.get once more
+        let x: Option<String> = con.get("key").ok();
+        assert_eq!(x, None);
+        assert_eq!(1, 2);
     }
 
     #[test]
