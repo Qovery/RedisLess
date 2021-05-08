@@ -188,6 +188,19 @@ fn run_command_and_get_response<T: Storage>(
                 }
                 None => protocol::NIL.to_vec(),
             },
+            Command::GetSet(k, v) => {
+                let mut storage_lock = lock_then_release(storage);
+
+                let response = match storage_lock.get(k.as_slice()) {
+                    Some(value) => {
+                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                        res.as_bytes().to_vec()
+                    }
+                    None => protocol::NIL.to_vec(),
+                };
+                storage_lock.set(k.as_slice(), v.as_slice());
+                response
+            }
             Command::Del(k) => {
                 let total_del = lock_then_release(storage).del(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
@@ -419,6 +432,33 @@ mod tests {
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
+    }
+
+    #[test]
+    #[serial]
+    fn get_set() {
+        let port = 3340;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let _: String = con.set("key1", "valueA").unwrap();
+        let x: String = con.getset("key1", "valueB").unwrap();
+        assert_eq!(x, "valueA");
+
+        let x: String = con.getset("key1", "valueC").unwrap();
+        assert_eq!(x, "valueB");
+
+        let x: String = con.get("key1").unwrap();
+        assert_eq!(x, "valueC");
+
+        let x: Option<String> = con.getset("key2", "value2").ok();
+        assert_eq!(x, None);
+
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "value2");
     }
 
     #[test]
