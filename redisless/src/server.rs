@@ -271,7 +271,7 @@ fn start_server<T: Storage + Send + 'static>(
     };
 
     let thread_pool = match rayon::ThreadPoolBuilder::new()
-        .thread_name(|_| "request handler".to_string())
+        .thread_name(|_| "resp".to_string())
         .num_threads(4)
         .build()
     {

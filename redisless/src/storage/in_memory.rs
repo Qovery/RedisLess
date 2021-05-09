@@ -120,8 +120,8 @@ impl Storage for InMemoryStorage {
 mod tests {
     use std::{thread::sleep, time::Duration};
 
-    use crate::in_memory::InMemoryStorage;
-    use crate::Storage;
+    use crate::storage::in_memory::InMemoryStorage;
+    use crate::storage::Storage;
 
     #[test]
     fn test_in_memory_storage() {

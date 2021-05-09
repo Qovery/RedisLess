@@ -8,6 +8,7 @@ use crate::server::{Server, ServerState};
 
 mod cluster;
 mod command;
+mod error;
 mod protocol;
 pub mod server;
 pub mod storage;
