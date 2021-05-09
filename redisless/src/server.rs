@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setex_and_expire() {
+    fn expire() {
         let port = 3335;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
@@ -403,15 +403,15 @@ mod tests {
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        let duration: usize = 3;
+        let duration: usize = 2387;
         let _: () = con.set("key2", "value2").unwrap();
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
 
-        let ret_val: u32 = con.expire("key2", duration).unwrap();
+        let ret_val: u32 = con.pexpire("key2", duration).unwrap();
         assert_eq!(ret_val, 1);
 
-        sleep(Duration::from_secs(duration as u64));
+        sleep(Duration::from_millis(duration as u64));
         let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
 
