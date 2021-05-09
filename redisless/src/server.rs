@@ -455,7 +455,7 @@ mod tests {
         // The value only gets deleted after having called with another con.get
 
         let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
-        let x: Option<String> = con.get("key").ok(); // works after calling con.get once more ??
+        let _: Option<String> = con.get("key").ok(); // works after calling con.get once more ??
         let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
     }
