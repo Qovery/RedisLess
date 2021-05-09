@@ -201,10 +201,10 @@ fn run_command_and_get_response<T: Storage>(
             }
             Command::GetDel(k) => {
                 let mut storage_lock = lock_then_release(storage);
-                match storage_lock.get(k.as_slice()) {
+                match storage_lock.read(k.as_slice()) {
                     Some(value) => {
                         let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                        let _ = storage_lock.del(k.as_slice());
+                        let _ = storage_lock.remove(k.as_slice());
                         res.as_bytes().to_vec()
                     }
                     None => protocol::NIL.to_vec(),
@@ -455,10 +455,10 @@ mod tests {
         // The value only gets deleted after having called with another con.get
 
         let _ = con.send_packed_command(cmd("GETDEL").arg("key").get_packed_command().as_slice());
-        let _: Option<String> = con.get("key").ok(); // works after calling con.get once more
-        let x: Option<String> = con.get("key").ok();
+        let x: Option<String> = con.get("key").ok(); // works after calling con.get once more
+        // let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
-        assert_eq!(1, 2);
+        //assert_eq!(1, 2);
     }
 
     #[test]
