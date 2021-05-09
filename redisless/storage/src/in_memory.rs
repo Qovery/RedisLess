@@ -12,15 +12,15 @@ pub struct Expiry {
 
 impl Expiry {
     pub fn new_from_millis(duration: u64) -> Option<Self> {
-        Instant::now().checked_add(Duration::from_millis(duration)).map(|t| {
-            Self { timestamp: t }
-        })
+        Instant::now()
+            .checked_add(Duration::from_millis(duration))
+            .map(|t| Self { timestamp: t })
     }
 
     pub fn new_from_secs(duration: u64) -> Option<Self> {
-        Instant::now().checked_add(Duration::from_secs(duration)).map(|t| {
-            Self { timestamp: t }
-        })
+        Instant::now()
+            .checked_add(Duration::from_secs(duration))
+            .map(|t| Self { timestamp: t })
     }
 }
 
@@ -37,8 +37,7 @@ impl RedisValue {
 
     pub fn is_expired(&self) -> bool {
         match &self.expiry {
-            Some(expiry) 
-            if expiry.timestamp <= Instant::now() => true,
+            Some(expiry) if expiry.timestamp <= Instant::now() => true,
             _ => false,
         }
     }
@@ -151,6 +150,5 @@ mod tests {
             sleep(Duration::from_millis(duration));
             assert_eq!(mem.read(b"key"), None);
         }
-        
     }
 }

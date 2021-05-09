@@ -171,8 +171,7 @@ fn run_command_and_get_response<T: Storage>(
 
                 protocol::OK.to_vec()
             }
-            Command::Expire(k, expiry)
-            | Command::PExpire(k, expiry) => {
+            Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
                 let v = lock_then_release(storage).expire(k.as_slice(), *expiry);
                 format!(":{}\r\n", v).as_bytes().to_vec()
             }
