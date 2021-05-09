@@ -26,7 +26,8 @@ if __name__ == '__main__':
         assert redis.getset('key2', 'valueB') == b'valueA'
 
         duration = 1
-        redis.expire('key2', duration)
+        assert redis.expire('key1000', 10) == False
+        assert redis.expire('key2', duration)
         assert redis.get('key2') == b'valueB'
         time.sleep(duration)
         assert redis.get('key2') is None
