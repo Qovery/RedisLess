@@ -1,3 +1,5 @@
+use storage::in_memory::Expiry;
+
 use crate::command::Command::{Error, NotSupported};
 use crate::protocol::Resp;
 
@@ -8,8 +10,9 @@ type Message = &'static str;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
-    Setex(Key, Value, u64),
-    Expire(Key, u64),
+    Setex(Key, Expiry, Value),
+    Expire(Key, Expiry),
+    PExpire(Key, Expiry),
     Get(Key),
     GetSet(Key, Value),
     Del(Key),
@@ -55,7 +58,11 @@ impl Command {
                             if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
                                 if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
                                     if let Ok(duration) = duration_str.parse::<u64>() {
-                                        return Command::Setex(key, value, duration);
+                                        if let Some(expiry) = Expiry::new_from_secs(duration) {
+                                            return Command::Setex(key, expiry, value);
+                                        } else {
+                                            return Error("too many seconds");
+                                        }
                                     } else {
                                         return Error("could not parse duration as u64");
                                     }
@@ -77,7 +84,11 @@ impl Command {
                         if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
                             if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
                                 if let Ok(duration) = duration_str.parse::<u64>() {
-                                    return Command::Expire(key, duration);
+                                    if let Some(expiry) = Expiry::new_from_secs(duration) {
+                                        return Command::Expire(key, expiry);
+                                    } else {
+                                        return Error("too many seconds");
+                                    }
                                 } else {
                                     return Error("could not parse duration as u64");
                                 }
@@ -88,6 +99,31 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'EXPIRE' command")
+                }
+                b"PEXPIRE" | b"Pexpire" | b"PExpire" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'PEXPIRE' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                            if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                if let Ok(duration) = duration_str.parse::<u64>() {
+                                    if let Some(expiry) = Expiry::new_from_millis(duration) {
+                                        return Command::PExpire(key, expiry);
+                                    } else {
+                                        return Error("too many milliseconds");
+                                    }
+                                } else {
+                                    return Error("could not parse duration as u64");
+                                }
+                            } else {
+                                return Error("bad string in request");
+                            }
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'PEXPIRE' command")
                 }
                 b"GET" | b"get" | b"Get" => {
                     if v.len() != 2 {
