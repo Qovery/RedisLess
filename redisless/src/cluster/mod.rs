@@ -82,7 +82,8 @@ impl Node {
                             }
                         }
 
-                        println!("{:?}", buf);
+                        // TODO convert bytes to Message payload
+                        // TODO and use sender.send(msg)
                     }
                 });
             }
@@ -118,8 +119,9 @@ impl Cluster {
         let peer_nodes = self.peer_nodes.clone();
 
         let _ = thread::spawn(move || {
-            let mut t = Instant::now();
-            let mut timeout = Duration::from_millis(100);
+            let mut now = Instant::now();
+            let timeout = Duration::from_millis(100);
+            let mut remaining_timeout = timeout;
             let mut raft = raft;
             let peer_nodes = peer_nodes;
 
@@ -135,14 +137,13 @@ impl Cluster {
                     Err(RecvTimeoutError::Disconnected) => break,
                 }
 
-                let d = t.elapsed();
-                t = Instant::now();
-                if d >= timeout {
-                    timeout = Duration::from_millis(100);
+                let elapsed = now.elapsed();
+                if elapsed >= timeout {
+                    remaining_timeout = timeout;
                     // We drive Raft every 100ms.
                     raft.tick();
                 } else {
-                    timeout -= d;
+                    remaining_timeout -= elapsed;
                 }
 
                 on_ready(&mut raft, &peer_nodes);
@@ -175,33 +176,20 @@ fn on_ready(raft: &mut RawNode<MemStorage>, peer_nodes: &Vec<Node>) {
     // Send out the messages come from the node.
     handle_messages(&ready.messages);
 
-    if !&ready.snapshot().data.is_empty() {
+    if !raft::is_empty_snap(ready.snapshot()) {
         // This is a snapshot, we need to apply the snapshot at first.
         store.wl().apply_snapshot(ready.snapshot().clone()).unwrap();
     }
 
-    let mut _last_apply_index = 0;
     let mut handle_committed_entries = |committed_entries: Option<&Vec<Entry>>| {
         let committed_entries = match committed_entries {
             Some(committed_entries) => committed_entries,
             None => return,
         };
 
+        let mut last_apply_index = 0;
         for entry in committed_entries {
-            // Mostly, you need to save the last apply index to resume applying
-            // after restart. Here we just ignore this because we use a Memory storage.
-            _last_apply_index = entry.index;
-
-            if entry.data.is_empty() {
-                // Emtpy entry, when the peer becomes Leader it will send an empty entry.
-                continue;
-            }
-
-            if entry.get_entry_type() == EntryType::EntryNormal {
-                // TODO exec what?
-            }
-
-            // TODO: handle EntryConfChange
+            last_apply_index = handle_entry(entry);
         }
     };
 
@@ -217,22 +205,32 @@ fn on_ready(raft: &mut RawNode<MemStorage>, peer_nodes: &Vec<Node>) {
         store.wl().set_hardstate(hs.clone());
     }
 
-    // // Advance the Raft.
-    // let _ = raft.advance(ready);
-    //
-    // // Update commit index.
-    // // if let Some(commit) = light_rd.commit_index() {
-    // //        store.wl().mut_hard_state().set_commit(commit);
-    // //  }
-    //
-    // // Send out the messages.
-    // handle_messages(raft.ready().messages);
-    //
-    // // Apply all committed entries.
-    // handle_committed_entries(light_rd.take_committed_entries());
-    //
-    // // Advance the apply index.
-    // raft.advance_apply(0); // TODO change?
+    if let Some(committed_entries) = ready.committed_entries.take() {
+        let mut last_apply_index = 0;
+        for entry in committed_entries.iter() {
+            last_apply_index = handle_entry(entry);
+        }
+    }
+
+    raft.advance(ready);
+}
+
+fn handle_entry(entry: &Entry) -> u64 {
+    // Mostly, you need to save the last apply index to resume applying
+    // after restart. Here we just ignore this because we use a Memory storage.
+    let last_apply_index = entry.get_index();
+
+    if entry.get_data().is_empty() {
+        // Emtpy entry, when the peer becomes Leader it will send an empty entry.
+        return last_apply_index;
+    }
+
+    match entry.get_entry_type() {
+        EntryType::EntryNormal => {}     // TODO handle normal entry
+        EntryType::EntryConfChange => {} // TODO handle conf change
+    };
+
+    last_apply_index
 }
 
 #[cfg(test)]
