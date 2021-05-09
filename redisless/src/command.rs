@@ -1,5 +1,7 @@
+use storage::in_memory::Expiry;
+
 use crate::command::Command::{Error, NotSupported};
-use crate::protocol::RESP;
+use crate::protocol::Resp;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -8,9 +10,11 @@ type Message = &'static str;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
-    Setex(Key, Value, u64),
-    Expire(Key, u64),
+    Setex(Key, Expiry, Value),
+    Expire(Key, Expiry),
+    PExpire(Key, Expiry),
     Get(Key),
+    GetSet(Key, Value),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -21,17 +25,17 @@ pub enum Command {
     NotSupported(String),
 }
 
-fn get_bytes_vec(resp: Option<&RESP>) -> Option<Vec<u8>> {
+fn get_bytes_vec(resp: Option<&Resp>) -> Option<Vec<u8>> {
     match resp {
-        Some(RESP::String(x)) | Some(RESP::BulkString(x)) => Some(x.to_vec()),
+        Some(Resp::String(x)) | Some(Resp::BulkString(x)) => Some(x.to_vec()),
         _ => None,
     }
 }
 
 impl Command {
-    pub fn parse(v: Vec<RESP>) -> Self {
+    pub fn parse(v: Vec<Resp>) -> Self {
         match v.first() {
-            Some(RESP::BulkString(op)) => match *op {
+            Some(Resp::BulkString(op)) => match *op {
                 b"SET" | b"set" | b"Set" => {
                     if v.len() != 3 {
                         return Error("wrong number of arguments for 'SET' command");
@@ -55,7 +59,11 @@ impl Command {
                             if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
                                 if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
                                     if let Ok(duration) = duration_str.parse::<u64>() {
-                                        return Command::Setex(key, value, duration);
+                                        if let Some(expiry) = Expiry::new_from_secs(duration) {
+                                            return Command::Setex(key, expiry, value);
+                                        } else {
+                                            return Error("too many seconds");
+                                        }
                                     } else {
                                         return Error("could not parse duration as u64");
                                     }
@@ -77,7 +85,11 @@ impl Command {
                         if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
                             if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
                                 if let Ok(duration) = duration_str.parse::<u64>() {
-                                    return Command::Expire(key, duration);
+                                    if let Some(expiry) = Expiry::new_from_secs(duration) {
+                                        return Command::Expire(key, expiry);
+                                    } else {
+                                        return Error("too many seconds");
+                                    }
                                 } else {
                                     return Error("could not parse duration as u64");
                                 }
@@ -89,6 +101,31 @@ impl Command {
 
                     Error("wrong number of arguments for 'EXPIRE' command")
                 }
+                b"PEXPIRE" | b"Pexpire" | b"PExpire" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'PEXPIRE' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(duration_bytes) = get_bytes_vec(v.get(2)) {
+                            if let Ok(duration_str) = std::str::from_utf8(&duration_bytes[..]) {
+                                if let Ok(duration) = duration_str.parse::<u64>() {
+                                    if let Some(expiry) = Expiry::new_from_millis(duration) {
+                                        return Command::PExpire(key, expiry);
+                                    } else {
+                                        return Error("too many milliseconds");
+                                    }
+                                } else {
+                                    return Error("could not parse duration as u64");
+                                }
+                            } else {
+                                return Error("bad string in request");
+                            }
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'PEXPIRE' command")
+                }
                 b"GET" | b"get" | b"Get" => {
                     if v.len() != 2 {
                         return Error("wrong number of arguments for 'GET' command");
@@ -99,6 +136,19 @@ impl Command {
                     }
 
                     Error("wrong number of arguments for 'GET' command")
+                }
+                b"GETSET" | b"getset" | b"Getset" | b"GetSet" => {
+                    if v.len() != 3 {
+                        return Error("wrong number of arguments for 'GETSET' command");
+                    }
+
+                    if let Some(key) = get_bytes_vec(v.get(1)) {
+                        if let Some(value) = get_bytes_vec(v.get(2)) {
+                            return Command::GetSet(key, value);
+                        }
+                    }
+
+                    Error("wrong number of arguments for 'SET' command")
                 }
                 b"DEL" | b"del" | b"Del" => {
                     if v.len() != 2 {
@@ -159,7 +209,7 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use crate::command::Command;
-    use crate::protocol::RESP;
+    use crate::protocol::Resp;
 
     #[test]
     fn set_command() {
@@ -167,9 +217,9 @@ mod tests {
 
         for cmd in commands {
             let resp = vec![
-                RESP::BulkString(cmd),
-                RESP::BulkString(b"mykey"),
-                RESP::BulkString(b"value"),
+                Resp::BulkString(cmd),
+                Resp::BulkString(b"mykey"),
+                Resp::BulkString(b"value"),
             ];
 
             let command = Command::parse(resp);
