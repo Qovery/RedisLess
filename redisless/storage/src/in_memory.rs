@@ -5,18 +5,22 @@ use std::{
 
 use crate::Storage;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Expiry {
     timestamp: Instant,
-    pub duration: u64,
 }
 
 impl Expiry {
-    pub fn new(duration: u64) -> Self {
-        Self {
-            timestamp: Instant::now(),
-            duration,
-        }
+    pub fn new_from_millis(duration: u64) -> Option<Self> {
+        Instant::now()
+            .checked_add(Duration::from_millis(duration))
+            .map(|t| Self { timestamp: t })
+    }
+
+    pub fn new_from_secs(duration: u64) -> Option<Self> {
+        Instant::now()
+            .checked_add(Duration::from_secs(duration))
+            .map(|t| Self { timestamp: t })
     }
 }
 
@@ -32,12 +36,10 @@ impl RedisValue {
     }
 
     pub fn is_expired(&self) -> bool {
-        if let Some(expiry) = &self.expiry {
-            if expiry.timestamp.elapsed() >= Duration::from_secs(expiry.duration) {
-                return true;
-            }
+        match &self.expiry {
+            Some(expiry) if expiry.timestamp <= Instant::now() => true,
+            _ => false,
         }
-        false
     }
 }
 
@@ -69,9 +71,9 @@ impl Storage for InMemoryStorage {
             .insert(key.to_vec(), RedisValue::new(value.to_vec(), None));
     }
 
-    fn expire(&mut self, key: &[u8], duration: u64) -> u32 {
+    fn expire(&mut self, key: &[u8], expiry: Expiry) -> u32 {
         if let Some(value) = self.string_store.get_mut(key) {
-            value.expiry = Some(Expiry::new(duration));
+            value.expiry = Some(expiry);
             1 // timeout was set
         } else {
             0 // key does not exist
@@ -112,7 +114,7 @@ impl Storage for InMemoryStorage {
 mod tests {
     use std::{thread::sleep, time::Duration};
 
-    use crate::in_memory::InMemoryStorage;
+    use crate::in_memory::{Expiry, InMemoryStorage};
     use crate::Storage;
 
     #[test]
@@ -128,11 +130,25 @@ mod tests {
     #[test]
     fn test_expire() {
         let mut mem = InMemoryStorage::new();
+
         let duration: u64 = 4;
         mem.write(b"key", b"xxx");
-        mem.expire(b"key", duration);
-        assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
-        sleep(Duration::from_secs(duration));
-        assert_eq!(mem.read(b"key"), None);
+        if let Some(e) = Expiry::new_from_secs(duration) {
+            let ret_val = mem.expire(b"key", e);
+            assert_eq!(ret_val, 1);
+            assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
+            sleep(Duration::from_secs(duration));
+            assert_eq!(mem.read(b"key"), None);
+        }
+
+        let duration: u64 = 1738;
+        mem.write(b"key", b"xxx");
+        if let Some(e) = Expiry::new_from_millis(duration) {
+            let ret_val = mem.expire(b"key", e);
+            assert_eq!(ret_val, 1);
+            assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
+            sleep(Duration::from_millis(duration));
+            assert_eq!(mem.read(b"key"), None);
+        }
     }
 }

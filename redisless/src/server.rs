@@ -163,16 +163,16 @@ fn run_command_and_get_response<T: Storage>(
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
-            Command::Setex(k, v, duration) => {
+            Command::Setex(k, expiry, v) => {
                 let mut storage = lock_then_release(storage);
 
                 storage.write(k.as_slice(), v.as_slice());
-                storage.expire(k.as_slice(), *duration);
+                storage.expire(k.as_slice(), *expiry);
 
                 protocol::OK.to_vec()
             }
-            Command::Expire(k, duration) => {
-                let v = lock_then_release(storage).expire(k.as_slice(), *duration);
+            Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
+                let v = lock_then_release(storage).expire(k.as_slice(), *expiry);
                 format!(":{}\r\n", v).as_bytes().to_vec()
             }
             Command::Get(k) => match lock_then_release(storage).read(k.as_slice()) {
@@ -395,13 +395,25 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setex_and_expire() {
+    fn expire() {
         let port = 3335;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
+
+        let duration: usize = 2387;
+        let _: () = con.set("key2", "value2").unwrap();
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "value2");
+
+        let ret_val: u32 = con.pexpire("key2", duration).unwrap();
+        assert_eq!(ret_val, 1);
+
+        sleep(Duration::from_millis(duration as u64));
+        let x: Option<String> = con.get("key2").ok();
+        assert_eq!(x, None);
 
         let duration: usize = 2;
         let _: () = con.set_ex("key", "value", duration).unwrap();
@@ -410,18 +422,6 @@ mod tests {
 
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key").ok();
-        assert_eq!(x, None);
-
-        let duration: usize = 3;
-        let _: () = con.set("key2", "value2").unwrap();
-        let x: String = con.get("key2").unwrap();
-        assert_eq!(x, "value2");
-
-        let ret_val: u32 = con.expire("key2", duration).unwrap();
-        assert_eq!(ret_val, 1);
-
-        sleep(Duration::from_secs(duration as u64));
-        let x: Option<String> = con.get("key2").ok();
         assert_eq!(x, None);
     }
 
