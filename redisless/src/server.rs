@@ -226,13 +226,13 @@ fn run_command_and_get_response<T: Storage>(
             Command::IncrBy(k, increment) => {
                 let mut storage = lock_then_release(storage);
 
-                match storage.get(k.as_slice()) {
+                match storage.read(k.as_slice()) {
                     Some(value) => {
                         if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
                         {
                             int_val += increment;
                             let new_value = int_val.to_string().into_bytes();
-                            storage.set(k.as_slice(), new_value.as_slice());
+                            storage.write(k.as_slice(), new_value.as_slice());
 
                             format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
@@ -242,7 +242,7 @@ fn run_command_and_get_response<T: Storage>(
                     }
                     None => {
                         let val = increment.to_string().into_bytes();
-                        storage.set(k, val.as_slice());
+                        storage.write(k, val.as_slice());
                         format!(":{}\r\n", increment).as_bytes().to_vec()
                     }
                 }
