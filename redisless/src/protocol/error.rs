@@ -8,7 +8,7 @@ use std::{
 #[derive(Debug)]
 pub enum RedisCommandError {
     // Wrong number of arguments, holds command
-    ArgNumber(String),
+    ArgNumber,
     // Overflow when setting the expiry timestamp
     TimeOverflow(TimeOverflow),
     // Could not convert bytes to UTF8
@@ -26,8 +26,8 @@ use storage::in_memory::TimeOverflow;
 impl Display for RedisCommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ArgNumber(cmd) => {
-                write!(f, "wrong number of arguments for {} command", cmd)
+            Self::ArgNumber => {
+                write!(f, "wrong number of arguments for command")
             }
             Self::TimeOverflow(e) => write!(f, "{:?}", e),
             Self::BadString(e) => write!(f, "{}", e),
@@ -55,5 +55,10 @@ impl From<Utf8Error> for RedisCommandError {
 impl From<ParseIntError> for RedisCommandError {
     fn from(err: ParseIntError) -> Self {
         Self::IntParse(err)
+    }
+}
+impl From<()> for RedisCommandError {
+    fn from(_: ()) -> Self {
+        Self::ArgNumber
     }
 }
