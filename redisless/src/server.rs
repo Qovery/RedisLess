@@ -146,7 +146,10 @@ fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
 
 fn get_command(bytes: &[u8; 512]) -> Option<Command> {
     match RedisProtocolParser::parse(bytes) {
-        Ok((Resp::Array(x), _)) => Some(Command::parse(x)),
+        Ok((Resp::Array(v), _)) => match Command::parse(v) {
+            Ok(command) => Some(command),
+            Err(_) => None,
+        },
         _ => None,
     }
 }
@@ -155,7 +158,7 @@ fn run_command_and_get_response<T: Storage>(
     storage: &Arc<Mutex<T>>,
     bytes: &[u8; 512],
 ) -> (Option<Command>, CommandResponse) {
-    let command = get_command(bytes);
+    let command = get_command(bytes); // HANDLE HERE ERROR
 
     let response = match &command {
         Some(command) => match command {
@@ -226,8 +229,8 @@ fn run_command_and_get_response<T: Storage>(
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
             Command::Quit => protocol::OK.to_vec(),
-            Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
-            Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+            //Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
+            //Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
         },
         None => b"-ERR command not found\r\n".to_vec(),
     };
