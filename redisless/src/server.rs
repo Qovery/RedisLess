@@ -8,9 +8,9 @@ use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
 use storage::Storage;
 
-use crate::command::Command;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, Resp};
+use crate::{command::Command, protocol::error::RedisCommandError};
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -144,10 +144,14 @@ fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
     (buf, buf_length)
 }
 
-fn get_command(bytes: &[u8; 512]) -> Option<Command> {
+fn get_command(bytes: &[u8; 512]) -> Result<Command, RedisCommandError> {
     match RedisProtocolParser::parse(bytes) {
-        Ok((Resp::Array(x), _)) => Some(Command::parse(x)),
-        _ => None,
+        Ok((Resp::Array(v), _)) => match Command::parse(v) {
+            Ok(command) => Ok(command),
+            Err(err) => Err(err),
+        },
+        Err(err) => Err(RedisCommandError::ProtocolParse(err)),
+        _ => Err(RedisCommandError::CommandNotFound),
     }
 }
 
@@ -158,7 +162,7 @@ fn run_command_and_get_response<T: Storage>(
     let command = get_command(bytes);
 
     let response = match &command {
-        Some(command) => match command {
+        Ok(command) => match command {
             Command::Set(k, v) => {
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
@@ -226,13 +230,11 @@ fn run_command_and_get_response<T: Storage>(
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
             Command::Quit => protocol::OK.to_vec(),
-            Command::NotSupported(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
-            Command::Error(m) => format!("-ERR {}\r\n", m).as_bytes().to_vec(),
         },
-        None => b"-ERR command not found\r\n".to_vec(),
+        Err(err) => format!("-ERR {}\r\n", err).as_bytes().to_vec(),
     };
 
-    (command, response)
+    (command.ok(), response)
 }
 
 fn handle_request<T: Storage>(

@@ -1,4 +1,5 @@
 pub type Result<'a> = std::result::Result<(Resp<'a>, &'a [u8]), RedisError>;
+pub mod error;
 
 const NIL_VALUE_SIZE: usize = 4;
 const CR: u8 = b'\r';
