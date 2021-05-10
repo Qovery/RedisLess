@@ -6,11 +6,11 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
+use storage::Storage;
 
 use crate::command::Command;
 use crate::protocol;
-use crate::protocol::{RedisProtocolParser, RESP};
-use crate::storage::Storage;
+use crate::protocol::{RedisProtocolParser, Resp};
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -46,8 +46,8 @@ impl Server {
         storage: T,
     ) {
         let addr = addr.into();
-        let state_send = self.server_state_bus.tx();
-        let state_recv = self.server_state_bus.rx();
+        let state_send = self.server_state_bus.sender();
+        let state_recv = self.server_state_bus.receiver();
 
         let _ = thread::spawn(move || {
             let addr = addr;
@@ -64,7 +64,7 @@ impl Server {
     }
 
     fn change_state(&self, change_to: ServerState) -> Option<ServerState> {
-        let send_state_ch = self.server_state_bus.tx();
+        let send_state_ch = self.server_state_bus.sender();
 
         let post_change_to_state = match change_to {
             ServerState::Start => ServerState::Started,
@@ -81,18 +81,11 @@ impl Server {
         });
 
         // wait for changing state
-        let rx = self.server_state_bus.rx(); // TODO cache rx to reuse it?
+        let receiver = self.server_state_bus.receiver(); // TODO cache receiver to reuse it?
 
-        loop {
-            match rx.recv_timeout(Duration::from_secs(5)) {
-                Ok(server_state) => {
-                    if server_state == post_change_to_state {
-                        return Some(server_state);
-                    }
-                }
-                Err(_) => {
-                    break;
-                }
+        while let Ok(server_state) = receiver.recv_timeout(Duration::from_secs(5)) {
+            if server_state == post_change_to_state {
+                return Some(server_state);
             }
         }
 
@@ -138,7 +131,7 @@ fn lock_then_release<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
 fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
     let mut buf_reader = BufReader::new(stream);
     let mut buf = [0; 512];
-    let mut buf_length = 0 as usize;
+    let mut buf_length = 0_usize;
 
     while let Ok(s) = buf_reader.read(&mut buf) {
         buf_length += s;
@@ -153,10 +146,7 @@ fn get_bytes_from_request(stream: &TcpStream) -> ([u8; 512], usize) {
 
 fn get_command(bytes: &[u8; 512]) -> Option<Command> {
     match RedisProtocolParser::parse(bytes) {
-        Ok((resp, _)) => match resp {
-            RESP::Array(x) => Some(Command::parse(x)),
-            _ => None,
-        },
+        Ok((Resp::Array(x), _)) => Some(Command::parse(x)),
         _ => None,
     }
 }
@@ -170,38 +160,55 @@ fn run_command_and_get_response<T: Storage>(
     let response = match &command {
         Some(command) => match command {
             Command::Set(k, v) => {
-                lock_then_release(storage).set(k.as_slice(), v.as_slice());
+                lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
-            Command::Setex(k, v, duration) => {
-                lock_then_release(storage).setex(k.as_slice(), v.as_slice(), *duration);
+            Command::Setex(k, expiry, v) => {
+                let mut storage = lock_then_release(storage);
+
+                storage.write(k.as_slice(), v.as_slice());
+                storage.expire(k.as_slice(), *expiry);
+
                 protocol::OK.to_vec()
             }
-            Command::Expire(k, duration) => {
-                let v = lock_then_release(storage).expire(k.as_slice(), *duration);
+            Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
+                let v = lock_then_release(storage).expire(k.as_slice(), *expiry);
                 format!(":{}\r\n", v).as_bytes().to_vec()
             }
-            Command::Get(k) => match lock_then_release(storage).get(k.as_slice()) {
+            Command::Get(k) => match lock_then_release(storage).read(k.as_slice()) {
                 Some(value) => {
                     let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                     res.as_bytes().to_vec()
                 }
                 None => protocol::NIL.to_vec(),
             },
+            Command::GetSet(k, v) => {
+                let mut storage_lock = lock_then_release(storage);
+
+                let response = match storage_lock.read(k.as_slice()) {
+                    Some(value) => {
+                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                        res.as_bytes().to_vec()
+                    }
+                    None => protocol::NIL.to_vec(),
+                };
+                storage_lock.write(k.as_slice(), v.as_slice());
+                response
+            }
             Command::Del(k) => {
-                let total_del = lock_then_release(storage).del(k.as_slice());
+                let total_del = lock_then_release(storage).remove(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
             }
             Command::Incr(k) => {
                 let mut storage = lock_then_release(storage);
 
-                match storage.get(k.as_slice()) {
+                match storage.read(k.as_slice()) {
                     Some(value) => {
                         if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
                         {
                             int_val += 1;
                             let new_value = int_val.to_string().into_bytes();
-                            storage.set(k.as_slice(), new_value.as_slice());
+                            storage.write(k.as_slice(), new_value.as_slice());
 
                             format!(":{}\r\n", int_val).as_bytes().to_vec()
                         } else {
@@ -211,7 +218,7 @@ fn run_command_and_get_response<T: Storage>(
                     }
                     None => {
                         let val = "1";
-                        storage.set(k, val.as_bytes());
+                        storage.write(k, val.as_bytes());
                         format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
@@ -252,7 +259,7 @@ fn handle_request<T: Storage>(
 }
 
 fn start_server<T: Storage + Send + 'static>(
-    addr: &String,
+    addr: &str,
     state_send: &Sender<ServerState>,
     state_recv: &Receiver<ServerState>,
     storage: &Arc<Mutex<T>>,
@@ -271,7 +278,7 @@ fn start_server<T: Storage + Send + 'static>(
     };
 
     let thread_pool = match rayon::ThreadPoolBuilder::new()
-        .thread_name(|_| "resp".to_string())
+        .thread_name(|_| "request handler".to_string())
         .num_threads(4)
         .build()
     {
@@ -309,14 +316,11 @@ fn start_server<T: Storage + Send + 'static>(
                             return;
                         }
 
-                        match last_update.duration_since(SystemTime::now()) {
-                            Ok(duration) => {
-                                if duration.as_secs() >= 300 {
-                                    // close the connection after 300 secs of inactivity
-                                    return;
-                                }
+                        if let Ok(duration) = last_update.duration_since(SystemTime::now()) {
+                            if duration.as_secs() >= 300 {
+                                // close the connection after 300 secs of inactivity
+                                return;
                             }
-                            Err(_) => {}
                         }
 
                         if close_connection {
@@ -345,9 +349,9 @@ mod tests {
     use std::{thread::sleep, time::Duration};
 
     use redis::{cmd, Commands, RedisResult};
+    use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
-    use crate::storage::in_memory::InMemoryStorage;
     use crate::Server;
 
     #[test]
@@ -391,13 +395,25 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setex_and_expire() {
+    fn expire() {
         let port = 3335;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
+
+        let duration: usize = 2387;
+        let _: () = con.set("key2", "value2").unwrap();
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "value2");
+
+        let ret_val: u32 = con.pexpire("key2", duration).unwrap();
+        assert_eq!(ret_val, 1);
+
+        sleep(Duration::from_millis(duration as u64));
+        let x: Option<String> = con.get("key2").ok();
+        assert_eq!(x, None);
 
         let duration: usize = 2;
         let _: () = con.set_ex("key", "value", duration).unwrap();
@@ -407,18 +423,33 @@ mod tests {
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
+    }
 
-        let duration: usize = 3;
-        let _: () = con.set("key2", "value2").unwrap();
+    #[test]
+    #[serial]
+    fn get_set() {
+        let port = 3340;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let _: String = con.set("key1", "valueA").unwrap();
+        let x: String = con.getset("key1", "valueB").unwrap();
+        assert_eq!(x, "valueA");
+
+        let x: String = con.getset("key1", "valueC").unwrap();
+        assert_eq!(x, "valueB");
+
+        let x: String = con.get("key1").unwrap();
+        assert_eq!(x, "valueC");
+
+        let x: Option<String> = con.getset("key2", "value2").ok();
+        assert_eq!(x, None);
+
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
-
-        let ret_val: u32 = con.expire("key2", duration).unwrap();
-        assert_eq!(ret_val, 1);
-
-        sleep(Duration::from_secs(duration as u64));
-        let x: Option<String> = con.get("key2").ok();
-        assert_eq!(x, None);
     }
 
     #[test]

@@ -169,6 +169,14 @@ cd scripts && ./build-for-mac.sh && cd ..
 
 Once the libs built, you are ready to use the clients into the [clients](clients) folder.
 
+# Contributors
+
+Thanks to our contributors ❤️
+
+<a href="https://github.com/Qovery/RedisLess/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Qovery/RedisLess" />
+</a>
+
 # References
 
 - Redis Internals: [Free e-book](https://redislabs.com/ebook)

@@ -1,4 +1,4 @@
-pub type Result<'a> = std::result::Result<(RESP<'a>, &'a [u8]), RedisError>;
+pub type Result<'a> = std::result::Result<(Resp<'a>, &'a [u8]), RedisError>;
 
 const NIL_VALUE_SIZE: usize = 4;
 const CR: u8 = b'\r';
@@ -12,12 +12,12 @@ pub const NIL: &[u8; 5] = b"$-1\r\n";
 pub struct RedisProtocolParser;
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum RESP<'a> {
+pub enum Resp<'a> {
     String(&'a [u8]),
     Error(&'a [u8]),
     Integer(&'a [u8]),
     BulkString(&'a [u8]),
-    Array(Vec<RESP<'a>>),
+    Array(Vec<Resp<'a>>),
     Nil,
 }
 
@@ -119,28 +119,28 @@ impl RedisProtocolParser {
     }
 
     pub fn parse_simple_string(input: &[u8]) -> Result {
-        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (RESP::String(x), y))
+        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (Resp::String(x), y))
     }
 
     pub fn parse_errors(input: &[u8]) -> Result {
-        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (RESP::Error(x), y))
+        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (Resp::Error(x), y))
     }
 
     pub fn parse_integers(input: &[u8]) -> Result {
-        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (RESP::Integer(x), y))
+        RedisProtocolParser::parse_everything_until_crlf(input).map(|(x, y)| (Resp::Integer(x), y))
     }
 
     pub fn parse_bulk_strings(input: &[u8]) -> Result {
         // Check Null Strings.
         if RedisProtocolParser::check_null_value(input) {
-            Ok((RESP::Nil, &input[NIL_VALUE_SIZE..]))
+            Ok((Resp::Nil, &input[NIL_VALUE_SIZE..]))
         } else {
             let (size_str, input_after_size) =
                 RedisProtocolParser::parse_everything_until_crlf(input)?;
             let size = std::str::from_utf8(size_str)?.parse::<u64>()? as usize;
             if RedisProtocolParser::check_crlf_at_index(input_after_size, size) {
                 Ok((
-                    RESP::BulkString(&input_after_size[..size]),
+                    Resp::BulkString(&input_after_size[..size]),
                     &input_after_size[size + 2..],
                 ))
             } else {
@@ -168,7 +168,7 @@ impl RedisProtocolParser {
             result.push(element);
             left = tmp;
         }
-        Ok((RESP::Array(result), left))
+        Ok((Resp::Array(result), left))
     }
 }
 
@@ -180,7 +180,7 @@ mod test {
     pub fn test_simple_string() -> std::result::Result<(), RedisError> {
         let input = "+hello\r\n".as_bytes();
         let (resp, left) = RedisProtocolParser::parse(input)?;
-        assert_eq!(resp, RESP::String("hello".as_bytes()));
+        assert_eq!(resp, Resp::String("hello".as_bytes()));
         assert!(left.is_empty());
         Ok(())
     }
@@ -209,7 +209,7 @@ mod test {
     pub fn test_nil() -> std::result::Result<(), RedisError> {
         let input = "$-1\r\n".as_bytes();
         let (resp, left) = RedisProtocolParser::parse(input)?;
-        assert_eq!(resp, RESP::Nil);
+        assert_eq!(resp, Resp::Nil);
         assert!(left.is_empty());
         Ok(())
     }
@@ -218,11 +218,11 @@ mod test {
     pub fn test_bulk_string() -> std::result::Result<(), RedisError> {
         let input = "$6\r\nfoobar\r\n".as_bytes();
         let (resp, left) = RedisProtocolParser::parse(input)?;
-        assert_eq!(resp, RESP::BulkString("foobar".as_bytes()));
+        assert_eq!(resp, Resp::BulkString("foobar".as_bytes()));
         assert!(left.is_empty());
         let input = "$0\r\n\r\n".as_bytes();
         let (resp, left) = RedisProtocolParser::parse(input)?;
-        assert_eq!(resp, RESP::BulkString("".as_bytes()));
+        assert_eq!(resp, Resp::BulkString("".as_bytes()));
         assert!(left.is_empty());
         Ok(())
     }
@@ -233,9 +233,9 @@ mod test {
         let (resp, left) = RedisProtocolParser::parse(input)?;
         assert_eq!(
             resp,
-            RESP::Array(vec![
-                RESP::BulkString("foo".as_bytes()),
-                RESP::BulkString("bar".as_bytes())
+            Resp::Array(vec![
+                Resp::BulkString("foo".as_bytes()),
+                Resp::BulkString("bar".as_bytes())
             ])
         );
         assert!(left.is_empty());
@@ -243,12 +243,12 @@ mod test {
         let (resp, left) = RedisProtocolParser::parse(input)?;
         assert_eq!(
             resp,
-            RESP::Array(vec![
-                RESP::Integer("1".as_bytes()),
-                RESP::Integer("2".as_bytes()),
-                RESP::Integer("3".as_bytes()),
-                RESP::Integer("4".as_bytes()),
-                RESP::BulkString("foobar".as_bytes()),
+            Resp::Array(vec![
+                Resp::Integer("1".as_bytes()),
+                Resp::Integer("2".as_bytes()),
+                Resp::Integer("3".as_bytes()),
+                Resp::Integer("4".as_bytes()),
+                Resp::BulkString("foobar".as_bytes()),
             ])
         );
         assert!(left.is_empty());
@@ -261,15 +261,15 @@ mod test {
         let (resp, left) = RedisProtocolParser::parse(input)?;
         assert_eq!(
             resp,
-            RESP::Array(vec![
-                RESP::Array(vec![
-                    RESP::Integer("1".as_bytes()),
-                    RESP::Integer("2".as_bytes()),
-                    RESP::Integer("3".as_bytes()),
+            Resp::Array(vec![
+                Resp::Array(vec![
+                    Resp::Integer("1".as_bytes()),
+                    Resp::Integer("2".as_bytes()),
+                    Resp::Integer("3".as_bytes()),
                 ]),
-                RESP::Array(vec![
-                    RESP::String("Foo".as_bytes()),
-                    RESP::Error("Bar".as_bytes()),
+                Resp::Array(vec![
+                    Resp::String("Foo".as_bytes()),
+                    Resp::Error("Bar".as_bytes()),
                 ]),
             ])
         );
