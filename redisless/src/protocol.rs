@@ -21,6 +21,9 @@ pub enum Resp<'a> {
     Nil,
 }
 
+use std::str::Utf8Error;
+
+use storage::in_memory::TimeOverflow;
 #[derive(Debug)]
 pub enum RedisErrorType {
     // Unknown symbol at index
@@ -32,6 +35,21 @@ pub enum RedisErrorType {
     // Incorrect format detected
     IncorrectFormat,
     Other(Box<dyn std::error::Error>),
+}
+
+#[derive(Debug)]
+pub enum RedisCommandError {
+    // Wrong number of arguments, holds command
+    ArgNumber(String),
+    // Overflow when setting the expiry timestamp
+    TimeOverflow(TimeOverflow),
+    // Could not convert bytes to UTF8
+    BadString(Utf8Error),
+    // Could not parse string for a u64
+    NumberParse(String),
+    // Command is not supported by Redisless
+    NotSupported(String),
+    InvalidCommand,
 }
 
 #[derive(Debug)]
