@@ -40,7 +40,7 @@ pub enum RedisErrorType {
 #[derive(Debug)]
 pub enum RedisCommandError {
     // Wrong number of arguments, holds command
-    ArgNumber(String /* Placeholder String */), 
+    ArgNumber(String /* Placeholder String */),
     // Overflow when setting the expiry timestamp
     TimeOverflow(TimeOverflow),
     // Could not convert bytes to UTF8
