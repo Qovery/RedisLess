@@ -35,94 +35,58 @@ impl Command {
             Some(Resp::BulkString(op)) => match *op {
                 // Reorganize ?
                 b"SET" | b"set" | b"Set" => {
-                    if v.len() == 3 {
-                        // Safe to unwrap index 1 and 2 if previously checked length
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        let value = get_bytes_vec(v.get(2)).unwrap();
-                        Ok(Command::Set(key, value))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    let value = get_bytes_vec(v.get(2)).ok_or(())?;
+                    Ok(Command::Set(key, value))
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
-                    if v.len() == 4 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        // Redis sends value as index 3 and duration as index 2
-                        let value = get_bytes_vec(v.get(3)).unwrap();
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
+                    let value = get_bytes_vec(v.get(3)).ok_or(())?;
 
-                        // Might wanna add a parse duration function
-                        let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration = std::str::from_utf8(&duration[..])?;
-                        let duration = duration.parse::<u64>()?;
-                        let expiry = Expiry::new_from_secs(duration)?;
+                    // Might wanna add a parse duration function
+                    let duration = std::str::from_utf8(&duration[..])?;
+                    let duration = duration.parse::<u64>()?;
+                    let expiry = Expiry::new_from_secs(duration)?;
 
-                        Ok(Command::Setex(key, expiry, value))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    Ok(Command::Setex(key, expiry, value))
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
-                    if v.len() == 3 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
 
-                        // Might wanna add a parse duration function
-                        let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration = std::str::from_utf8(&duration[..])?;
-                        let duration = duration.parse::<u64>()?;
-                        let expiry = Expiry::new_from_secs(duration)?;
+                    let duration = std::str::from_utf8(&duration[..])?;
+                    let duration = duration.parse::<u64>()?;
+                    let expiry = Expiry::new_from_secs(duration)?;
 
-                        Ok(Command::Expire(key, expiry))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    Ok(Command::Expire(key, expiry))
                 }
                 b"PEXPIRE" | b"Pexpire" | b"PExpire" | b"pexpire" => {
-                    if v.len() == 3 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
 
-                        // Might wanna add a parse duration function
-                        let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration = std::str::from_utf8(&duration[..])?;
-                        let duration = duration.parse::<u64>()?;
-                        let expiry = Expiry::new_from_millis(duration)?;
+                    let duration = std::str::from_utf8(&duration[..])?;
+                    let duration = duration.parse::<u64>()?;
+                    let expiry = Expiry::new_from_millis(duration)?;
 
-                        Ok(Command::PExpire(key, expiry))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    Ok(Command::PExpire(key, expiry))
                 }
                 b"GET" | b"get" | b"Get" => {
-                    if v.len() == 2 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        Ok(Command::Get(key))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    Ok(Command::Get(key))
                 }
                 b"GETSET" | b"getset" | b"Getset" | b"GetSet" => {
-                    if v.len() == 3 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        let value = get_bytes_vec(v.get(2)).unwrap();
-                        Ok(Command::GetSet(key, value))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    let value = get_bytes_vec(v.get(2)).ok_or(())?;
+                    Ok(Command::GetSet(key, value))
                 }
                 b"DEL" | b"del" | b"Del" => {
-                    if v.len() == 2 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        Ok(Command::Del(key))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    Ok(Command::Del(key))
                 }
                 b"INCR" | b"incr" | b"Incr" => {
-                    if v.len() == 2 {
-                        let key = get_bytes_vec(v.get(1)).unwrap();
-                        Ok(Command::Incr(key))
-                    } else {
-                        Err(ArgNumber(format!("{:?}", op)))
-                    }
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    Ok(Command::Incr(key))
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Command::Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Command::Ping),
