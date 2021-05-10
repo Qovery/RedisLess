@@ -40,15 +40,15 @@ pub enum RedisErrorType {
 #[derive(Debug)]
 pub enum RedisCommandError {
     // Wrong number of arguments, holds command
-    ArgNumber(String),
+    ArgNumber(String /* Placeholder String */), 
     // Overflow when setting the expiry timestamp
     TimeOverflow(TimeOverflow),
     // Could not convert bytes to UTF8
     BadString(Utf8Error),
     // Could not parse string for a u64
-    NumberParse(String),
+    NumberParse(String /* Placeholder String */),
     // Command is not supported by Redisless
-    NotSupported(String),
+    NotSupported(String /* Placeholder String */),
     InvalidCommand,
 }
 
