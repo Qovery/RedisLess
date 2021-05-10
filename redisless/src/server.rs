@@ -11,8 +11,8 @@ use storage::Storage;
 use crate::command::Command;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, Resp};
-use std::convert::TryInto;
 use std::borrow::Borrow;
+use std::convert::TryInto;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
