@@ -1,7 +1,6 @@
-use storage::in_memory::Expiry;
-
 use crate::command::Command::{Error, NotSupported};
 use crate::protocol::Resp;
+use crate::storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;

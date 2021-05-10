@@ -1,9 +1,8 @@
+use crate::storage::Storage;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
 };
-
-use crate::Storage;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Expiry {
@@ -114,8 +113,8 @@ impl Storage for InMemoryStorage {
 mod tests {
     use std::{thread::sleep, time::Duration};
 
-    use crate::in_memory::{Expiry, InMemoryStorage};
-    use crate::Storage;
+    use crate::storage::in_memory::{Expiry, InMemoryStorage};
+    use crate::storage::Storage;
 
     #[test]
     fn test_in_memory_storage() {
