@@ -138,7 +138,7 @@ mod tests {
 
         let duration: u64 = 4;
         mem.write(b"key", b"xxx");
-        if let Some(e) = Expiry::new_from_secs(duration) {
+        if let Ok(e) = Expiry::new_from_secs(duration) {
             let ret_val = mem.expire(b"key", e);
             assert_eq!(ret_val, 1);
             assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
@@ -148,7 +148,7 @@ mod tests {
 
         let duration: u64 = 1738;
         mem.write(b"key", b"xxx");
-        if let Some(e) = Expiry::new_from_millis(duration) {
+        if let Ok(e) = Expiry::new_from_millis(duration) {
             let ret_val = mem.expire(b"key", e);
             assert_eq!(ret_val, 1);
             assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
