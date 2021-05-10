@@ -3,7 +3,6 @@ use storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
-type Message = &'static str;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -27,7 +26,7 @@ fn get_bytes_vec(resp: Option<&Resp>) -> Option<Vec<u8>> {
     }
 }
 
-use super::protocol::RedisCommandError;
+use super::protocol::error::RedisCommandError;
 
 impl Command {
     pub fn parse(v: Vec<Resp>) -> Result<Self, RedisCommandError> {
@@ -37,6 +36,7 @@ impl Command {
                 // Reorganize ?
                 b"SET" | b"set" | b"Set" => {
                     if v.len() == 3 {
+                        // Safe to unwrap index 1 and 2 if previously checked length
                         let key = get_bytes_vec(v.get(1)).unwrap();
                         let value = get_bytes_vec(v.get(2)).unwrap();
                         Ok(Command::Set(key, value))
@@ -52,14 +52,9 @@ impl Command {
 
                         // Might wanna add a parse duration function
                         let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration =
-                            std::str::from_utf8(&duration[..]).map_err(|e| BadString(e))?;
-                        let duration = duration
-                            .parse::<u64>()
-                            .map_err(|e| NumberParse(format!("{}", e)))?;
-
-                        let expiry =
-                            Expiry::new_from_secs(duration).map_err(|e| TimeOverflow(e))?;
+                        let duration = std::str::from_utf8(&duration[..])?;
+                        let duration = duration.parse::<u64>()?;
+                        let expiry = Expiry::new_from_secs(duration)?;
 
                         Ok(Command::Setex(key, expiry, value))
                     } else {
@@ -72,14 +67,9 @@ impl Command {
 
                         // Might wanna add a parse duration function
                         let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration =
-                            std::str::from_utf8(&duration[..]).map_err(|e| BadString(e))?;
-                        let duration = duration
-                            .parse::<u64>()
-                            .map_err(|e| NumberParse(format!("{}", e)))?;
-
-                        let expiry =
-                            Expiry::new_from_secs(duration).map_err(|e| TimeOverflow(e))?;
+                        let duration = std::str::from_utf8(&duration[..])?;
+                        let duration = duration.parse::<u64>()?;
+                        let expiry = Expiry::new_from_secs(duration)?;
 
                         Ok(Command::Expire(key, expiry))
                     } else {
@@ -92,14 +82,9 @@ impl Command {
 
                         // Might wanna add a parse duration function
                         let duration = get_bytes_vec(v.get(2)).unwrap();
-                        let duration =
-                            std::str::from_utf8(&duration[..]).map_err(|e| BadString(e))?;
-                        let duration = duration
-                            .parse::<u64>()
-                            .map_err(|e| NumberParse(format!("{}", e)))?;
-
-                        let expiry =
-                            Expiry::new_from_millis(duration).map_err(|e| TimeOverflow(e))?;
+                        let duration = std::str::from_utf8(&duration[..])?;
+                        let duration = duration.parse::<u64>()?;
+                        let expiry = Expiry::new_from_millis(duration)?;
 
                         Ok(Command::PExpire(key, expiry))
                     } else {
@@ -142,10 +127,11 @@ impl Command {
                 b"INFO" | b"info" | b"Info" => Ok(Command::Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Command::Ping),
                 b"QUIT" | b"quit" | b"Quit" => Ok(Command::Quit),
-                unsupported_command => Err(NotSupported(format!(
-                    "{}",
-                    std::str::from_utf8(unsupported_command).unwrap()
-                ))),
+                unsupported_command => Err(NotSupported(
+                    std::str::from_utf8(unsupported_command)
+                        .unwrap()
+                        .to_string(),
+                )),
             },
             _ => Err(InvalidCommand),
         }
@@ -160,7 +146,6 @@ mod tests {
     #[test]
     fn set_command() {
         let commands = vec![b"SET", b"set"];
-
         for cmd in commands {
             let resp = vec![
                 Resp::BulkString(cmd),
