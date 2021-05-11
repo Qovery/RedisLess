@@ -27,16 +27,9 @@ fn get_bytes_vec(resp: Option<&Resp>) -> Result<Vec<u8>, RedisCommandError> {
     }
 }
 
-fn parse_expiry_secs(bytes: Vec<u8>) -> Result<Expiry, RedisCommandError> {
+fn parse_duration(bytes: Vec<u8>)  -> Result<u64, RedisCommandError> {
     let duration = std::str::from_utf8(&bytes[..])?;
-    let duration = duration.parse::<u64>()?;
-    Ok(Expiry::new_from_secs(duration)?)
-}
-
-fn parse_expiry_millis(bytes: Vec<u8>) -> Result<Expiry, RedisCommandError> {
-    let duration = std::str::from_utf8(&bytes[..])?;
-    let duration = duration.parse::<u64>()?;
-    Ok(Expiry::new_from_millis(duration)?)
+    Ok(duration.parse::<u64>()?)
 }
 
 impl Command {
@@ -46,31 +39,34 @@ impl Command {
         
         match v.first() {
             Some(Resp::BulkString(command)) => match *command {
-                // Reorganize ?
                 b"SET" | b"set" | b"Set" => {
                     let key = get_bytes_vec(v.get(1))?;
                     let value = get_bytes_vec(v.get(2))?;
+
                     Ok(Set(key, value))
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))?;
+                    let duration = get_bytes_vec(v.get(2))
+                        .and_then(|b| parse_duration(b))?;
                     let value = get_bytes_vec(v.get(3))?;
-                    let expiry = parse_expiry_secs(duration)?;
+                    let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Setex(key, expiry, value))
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))?;
-                    let expiry = parse_expiry_secs(duration)?;
+                    let duration = get_bytes_vec(v.get(2))
+                        .and_then(|b| parse_duration(b))?;
+                    let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Expire(key, expiry))
                 }
                 b"PEXPIRE" | b"Pexpire" | b"PExpire" | b"pexpire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))?;
-                    let expiry = parse_expiry_millis(duration)?;
+                    let duration = get_bytes_vec(v.get(2))
+                        .and_then(|b| parse_duration(b))?;
+                    let expiry = Expiry::new_from_millis(duration)?;
 
                     Ok(PExpire(key, expiry))
                 }
@@ -81,6 +77,7 @@ impl Command {
                 b"GETSET" | b"getset" | b"Getset" | b"GetSet" => {
                     let key = get_bytes_vec(v.get(1))?;
                     let value = get_bytes_vec(v.get(2))?;
+
                     Ok(GetSet(key, value))
                 }
                 b"DEL" | b"del" | b"Del" => {
