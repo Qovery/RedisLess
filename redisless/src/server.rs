@@ -503,7 +503,7 @@ mod tests {
 
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
-        
+
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
     #[test]
@@ -530,7 +530,7 @@ mod tests {
         assert_eq!(x, "val2");
         let x: String = con.get("key3").unwrap();
         assert_eq!(x, "val3");
-        
+
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
