@@ -182,5 +182,5 @@ Thanks to our contributors ❤️
 - Redis Internals: [Free e-book](https://redislabs.com/ebook)
 - [Redis Protocol Specification](https://redis.io/topics/protocol) (RESP)
 - [Sonic](https://github.com/valeriansaliou/sonic): fast and lightweight Elasticsearch alternative
-- [Mnesia](https://erlang.org/doc/man/mnesia.html): Erland distributed DBMS
+- [Mnesia](https://erlang.org/doc/man/mnesia.html): Erlang distributed DBMS
 - [Hazelcast](https://hazelcast.com): Java distributed in-memory datastructures
