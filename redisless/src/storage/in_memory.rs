@@ -9,17 +9,22 @@ pub struct Expiry {
     timestamp: Instant,
 }
 
+#[derive(Debug)]
+pub struct TimeOverflow {}
+
 impl Expiry {
-    pub fn new_from_millis(duration: u64) -> Option<Self> {
+    pub fn new_from_millis(duration: u64) -> Result<Self, TimeOverflow> {
         Instant::now()
             .checked_add(Duration::from_millis(duration))
             .map(|t| Self { timestamp: t })
+            .ok_or(TimeOverflow{})
     }
 
-    pub fn new_from_secs(duration: u64) -> Option<Self> {
+    pub fn new_from_secs(duration: u64) -> Result<Self, TimeOverflow> {
         Instant::now()
             .checked_add(Duration::from_secs(duration))
             .map(|t| Self { timestamp: t })
+            .ok_or(TimeOverflow{})
     }
 }
 
@@ -132,7 +137,7 @@ mod tests {
 
         let duration: u64 = 4;
         mem.write(b"key", b"xxx");
-        if let Some(e) = Expiry::new_from_secs(duration) {
+        if let Ok(e) = Expiry::new_from_secs(duration) {
             let ret_val = mem.expire(b"key", e);
             assert_eq!(ret_val, 1);
             assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
@@ -142,7 +147,7 @@ mod tests {
 
         let duration: u64 = 1738;
         mem.write(b"key", b"xxx");
-        if let Some(e) = Expiry::new_from_millis(duration) {
+        if let Ok(e) = Expiry::new_from_millis(duration) {
             let ret_val = mem.expire(b"key", e);
             assert_eq!(ret_val, 1);
             assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
