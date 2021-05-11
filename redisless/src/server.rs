@@ -179,11 +179,11 @@ fn run_command_and_get_response<T: Storage>(
                 let mut storage = lock_then_release(storage);
                 match storage.contains(k) {
                     // Key exists, will not re set key
-                    true => ":0\r\n".as_bytes().to_vec(),
+                    true => b":0\r\n".to_vec(),
                     // Key does not exist, will set key
                     false => {
                         storage.write(k, v);
-                        ":1\r\n".as_bytes().to_vec()
+                        b":1\r\n".to_vec()
                     }
                 }
             }
@@ -194,10 +194,10 @@ fn run_command_and_get_response<T: Storage>(
                     // None of the keys already exist in the storage
                     true => {
                         items.iter().for_each(|(k, v)| storage.write(k, v));
-                        ":1\r\n".as_bytes().to_vec()
+                        b":1\r\n".to_vec()
                     }
                     // Some key exists, don't write any of the keys
-                    false => ":0\r\n".as_bytes().to_vec(),
+                    false => b":0\r\n".to_vec(),
                 }
             }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
