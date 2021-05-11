@@ -182,7 +182,7 @@ fn run_command_and_get_response<T: Storage>(
                     0 => {
                         storage.write(k, v);
                         ":1\r\n".as_bytes().to_vec()
-                    },
+                    }
                     // Key exists, will not re set key
                     1 => ":0\r\n".as_bytes().to_vec(),
                     _ => unreachable!(),
@@ -413,7 +413,7 @@ mod tests {
 
         let x: u32 = con.set_nx("key3", "value3").unwrap();
         assert_eq!(x, 1);
-        
+
         let x: String = con.get("key3").unwrap();
         assert_eq!(x, "value3");
 
