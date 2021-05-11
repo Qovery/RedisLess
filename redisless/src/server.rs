@@ -175,6 +175,19 @@ fn run_command_and_get_response<T: Storage>(
 
                 protocol::OK.to_vec()
             }
+            Command::Setnx(k, v) => {
+                let mut storage = lock_then_release(storage);
+                match storage.contains(k) {
+                    // Key does not exist, will set key
+                    0 => {
+                        storage.write(k, v);
+                        ":1\r\n".as_bytes().to_vec()
+                    },
+                    // Key exists, will not re set key
+                    1 => ":0\r\n".as_bytes().to_vec(),
+                    _ => unreachable!(),
+                }
+            }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
                 let v = lock_then_release(storage).expire(k.as_slice(), *expiry);
                 format!(":{}\r\n", v).as_bytes().to_vec()
@@ -388,9 +401,21 @@ mod tests {
         let x: u32 = con.del("key").unwrap();
         assert_eq!(x, 0);
 
-        let _: () = con.set("key2", "value2").unwrap();
+        let _: () = con.set("key2", "original value").unwrap();
         let x: String = con.get("key2").unwrap();
-        assert_eq!(x, "value2");
+        assert_eq!(x, "original value");
+
+        let x: u32 = con.set_nx("key2", "new value").unwrap();
+        assert_eq!(x, 0);
+
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "original value");
+
+        let x: u32 = con.set_nx("key3", "value3").unwrap();
+        assert_eq!(x, 1);
+        
+        let x: String = con.get("key3").unwrap();
+        assert_eq!(x, "value3");
 
         let _: () = con.set("intkey", "10").unwrap();
         let _ = con

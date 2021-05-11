@@ -8,6 +8,7 @@ type Value = Vec<u8>;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
+    Setnx(Key, Value),
     Setex(Key, Expiry, Value),
     Expire(Key, Expiry),
     PExpire(Key, Expiry),
@@ -53,6 +54,12 @@ impl Command {
                     let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Setex(key, expiry, value))
+                }
+                b"SETNX" | b"setnx" | b"Setnx" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(Setnx(key, value))
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
                     let key = get_bytes_vec(v.get(1))?;
