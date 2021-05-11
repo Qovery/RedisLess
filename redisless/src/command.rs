@@ -68,7 +68,7 @@ impl Command {
                         match key_value {
                             [key, value] => {
                                 let key = get_bytes_vec(Some(&key))?;
-                                 let value = get_bytes_vec(Some(&value))?;
+                                let value = get_bytes_vec(Some(&value))?;
                                 items_vec.push((key, value));
                             }
                             _ => return Err(ArgNumber),

@@ -197,9 +197,7 @@ fn run_command_and_get_response<T: Storage>(
                         ":1\r\n".as_bytes().to_vec()
                     }
                     // Some key exists, don't write any of the keys
-                    false => {
-                        ":0\r\n".as_bytes().to_vec()
-                    },
+                    false => ":0\r\n".as_bytes().to_vec(),
                 }
             }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
@@ -514,11 +512,13 @@ mod tests {
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        // what should happen if keys are repeated in the request? currently the last one is the one  that is set 
+        // what should happen if keys are repeated in the request? currently the last one is the one  that is set
         // i think the official redis implementation behaves this way as well?
-        let key_value_pairs = &[("key1", "val1"),("key2", "val2"),("key3", "val3")][..];
+        let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
 
-        let x = con.mset_nx::<&'static str, &'static str, u32>(key_value_pairs).unwrap();
+        let x = con
+            .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
+            .unwrap();
         assert_eq!(x, 1);
         let x: String = con.get("key1").unwrap();
         assert_eq!(x, "val1");
