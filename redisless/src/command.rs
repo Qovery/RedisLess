@@ -14,6 +14,7 @@ pub enum Command {
     GetSet(Key, Value),
     Del(Key),
     Incr(Key),
+    Type(Key),
     Info,
     Ping,
     Quit,
@@ -88,6 +89,10 @@ impl Command {
                     let key = get_bytes_vec(v.get(1)).ok_or(())?;
                     Ok(Command::Incr(key))
                 }
+                b"TYPE" | b"type" | b"Type" => {
+                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
+                    Ok(Command::Type(key))
+                }
                 b"INFO" | b"info" | b"Info" => Ok(Command::Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Command::Ping),
                 b"QUIT" | b"quit" | b"Quit" => Ok(Command::Quit),
@@ -119,6 +124,17 @@ mod tests {
 
             let command = Command::parse(resp).unwrap();
             assert_eq!(command, Command::Set(b"mykey".to_vec(), b"value".to_vec()));
+        }
+    }
+
+    #[test]
+    fn type_command() {
+        let commands = vec![b"TYPE", b"Type", b"type"];
+        for cmd in commands {
+            let command =
+                Command::parse(vec![Resp::BulkString(cmd), Resp::BulkString(b"mykey")]).unwrap();
+
+            assert_eq!(command, Command::Type(b"mykey".to_vec()));
         }
     }
 }

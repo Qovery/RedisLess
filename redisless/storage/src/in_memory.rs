@@ -18,14 +18,14 @@ impl Expiry {
         Instant::now()
             .checked_add(Duration::from_millis(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 
     pub fn new_from_secs(duration: u64) -> Result<Self, TimeOverflow> {
         Instant::now()
             .checked_add(Duration::from_secs(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 }
 
@@ -111,6 +111,19 @@ impl Storage for InMemoryStorage {
                 DataType::Hash => 0,
             },
             None => 0,
+        }
+    }
+
+    fn value_type(&mut self, key: &[u8]) -> String {
+        if let Some(data_type) = self.data_mapper.get(key) {
+            match data_type {
+                DataType::String => format!("string"),
+                DataType::List => format!("list"),
+                DataType::Set => format!("set"),
+                DataType::Hash => format!("hash"),
+            }
+        } else {
+            format!("none")
         }
     }
 }
