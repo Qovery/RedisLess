@@ -1,8 +1,9 @@
-use crate::storage::Storage;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
 };
+
+use crate::storage::Storage;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Expiry {
@@ -17,14 +18,14 @@ impl Expiry {
         Instant::now()
             .checked_add(Duration::from_millis(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 
     pub fn new_from_secs(duration: u64) -> Result<Self, TimeOverflow> {
         Instant::now()
             .checked_add(Duration::from_secs(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 }
 
