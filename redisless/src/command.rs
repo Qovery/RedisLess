@@ -4,12 +4,14 @@ use storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
+type Items = Vec<(Key, Value)>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
+    MSetnx(Items),
     Expire(Key, Expiry),
     PExpire(Key, Expiry),
     Get(Key),
@@ -54,6 +56,25 @@ impl Command {
                     let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Setex(key, expiry, value))
+                }
+                b"MSETNX" | b"MSetnx" | b"msetnx" => {
+                    // Draft implementation
+                    // Will panic if msetnx has somehow been called with no args, fix later
+                    // Maybe do something like split and grab the right partition which should be if it's empty
+                    let request = &v[1..]; // [key, value, key, value, key, value, ...] assuming it's even
+                    let mut items_vec = Vec::<(Key, Value)>::new();
+                    // Now need to map every key value pair into its own iter
+                    for key_value in request.chunks(2) {
+                        match key_value {
+                            [key, value] => {
+                                let key = get_bytes_vec(Some(&key))?;
+                                 let value = get_bytes_vec(Some(&value))?;
+                                items_vec.push((key, value));
+                            }
+                            _ => return Err(ArgNumber),
+                        }
+                    }
+                    Ok(MSetnx(items_vec))
                 }
                 b"SETNX" | b"setnx" | b"Setnx" => {
                     let key = get_bytes_vec(v.get(1))?;

@@ -114,11 +114,8 @@ impl Storage for InMemoryStorage {
         }
     }
 
-    fn contains(&mut self, key: &[u8]) -> u32 {
-        match self.data_mapper.contains_key(key) {
-            true => 1,
-            false => 0,
-        }
+    fn contains(&mut self, key: &[u8]) -> bool {
+        self.data_mapper.contains_key(key)
     }
 }
 

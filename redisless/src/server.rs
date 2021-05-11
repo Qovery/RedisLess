@@ -178,14 +178,28 @@ fn run_command_and_get_response<T: Storage>(
             Command::Setnx(k, v) => {
                 let mut storage = lock_then_release(storage);
                 match storage.contains(k) {
+                    // Key exists, will not re set key
+                    true => ":0\r\n".as_bytes().to_vec(),
                     // Key does not exist, will set key
-                    0 => {
+                    false => {
                         storage.write(k, v);
                         ":1\r\n".as_bytes().to_vec()
                     }
-                    // Key exists, will not re set key
-                    1 => ":0\r\n".as_bytes().to_vec(),
-                    _ => unreachable!(),
+                }
+            }
+            Command::MSetnx(items) => {
+                // Either set all or not set any at all if any already exist
+                let mut storage = lock_then_release(storage);
+                match items.iter().all(|(key, _)| !storage.contains(key)) {
+                    // None of the keys already exist in the storage
+                    true => {
+                        items.iter().for_each(|(k, v)| storage.write(k, v));
+                        ":1\r\n".as_bytes().to_vec()
+                    }
+                    // Some key exists, don't write any of the keys
+                    false => {
+                        ":0\r\n".as_bytes().to_vec()
+                    },
                 }
             }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
@@ -242,6 +256,10 @@ fn run_command_and_get_response<T: Storage>(
             }
             Command::Exists(k) => {
                 let exists = lock_then_release(storage).contains(k);
+                let exists: u32 = match exists {
+                    true => 1,
+                    false => 0,
+                };
                 format!(":{}\r\n", exists).as_bytes().to_vec()
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
@@ -485,6 +503,29 @@ mod tests {
 
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
+    }
+    #[test]
+    #[serial]
+    fn mset_nx() {
+        // make these first 5 lines into a macro?
+        let port = 3348;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        // what should happen if keys are repeated in the request? currently the last one is the one  that is set 
+        // i think the official redis implementation behaves this way as well?
+        let key_value_pairs = &[("key1", "val1"),("key2", "val2"),("key3", "val3")][..];
+
+        let x = con.mset_nx::<&'static str, &'static str, u32>(key_value_pairs).unwrap();
+        assert_eq!(x, 1);
+        let x: String = con.get("key1").unwrap();
+        assert_eq!(x, "val1");
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "val2");
+        let x: String = con.get("key3").unwrap();
+        assert_eq!(x, "val3");
     }
 
     #[test]
