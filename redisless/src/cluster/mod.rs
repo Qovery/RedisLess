@@ -6,18 +6,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{unbounded, Receiver, RecvTimeoutError};
-use raft::prelude::*;
-use raft::storage::MemStorage;
-use raft::{Config, RawNode};
-
-#[derive(Debug, Clone)]
-enum Msg {
-    Propose {
-        id: u8,
-        //callback: Box<dyn Fn() + Send>,
-    },
-    Raft(Message),
-}
 
 /// A Node represent a single RedisLess instance within a Cluster.
 #[derive(Debug, Clone)]
@@ -31,24 +19,9 @@ impl Node {
         Node { id, socket_addr }
     }
 
-    fn raft(&self) -> Result<RawNode<MemStorage>, std::io::Error> {
-        let config = Config {
-            id: self.id,
-            ..Default::default()
-        };
-
-        let node = match RawNode::new(&config, MemStorage::default(), vec![]) {
-            Ok(raw_node) => raw_node,
-            Err(err) => return Err(Error::new(ErrorKind::Other, err.to_string())),
-        };
-
-        Ok(node)
-    }
-
-    pub fn listen(&self) -> Result<Receiver<Msg>, std::io::Error> {
+    pub fn listen(&self) -> Result<Receiver<()>, std::io::Error> {
         let listener = TcpListener::bind(self.socket_addr.to_string())?;
-
-        let (sender, recv) = unbounded::<Msg>();
+        let (sender, recv) = unbounded::<()>();
 
         let _ = thread::spawn(move || {
             let sender = sender;
@@ -94,7 +67,7 @@ impl Node {
         Ok(recv)
     }
 
-    pub fn send(&self, message: &Message) {
+    pub fn send(&self, message: ()) {
         // TODO
     }
 }
@@ -115,24 +88,17 @@ impl Cluster {
 
     pub fn init(&self) -> Result<(), std::io::Error> {
         let receiver = self.current_node.listen()?;
-        let raft = self.current_node.raft()?;
         let peer_nodes = self.peer_nodes.clone();
 
         let _ = thread::spawn(move || {
             let mut now = Instant::now();
             let timeout = Duration::from_millis(100);
             let mut remaining_timeout = timeout;
-            let mut raft = raft;
             let peer_nodes = peer_nodes;
 
             loop {
                 match receiver.recv_timeout(timeout) {
-                    Ok(Msg::Propose { id }) => {
-                        let _ = raft.propose(vec![], vec![id]); // TODO catch errors
-                    }
-                    Ok(Msg::Raft(msg)) => {
-                        let _ = raft.step(msg); // TODO catch errors
-                    }
+                    Ok(msg) => msg,
                     Err(RecvTimeoutError::Timeout) => (),
                     Err(RecvTimeoutError::Disconnected) => break,
                 }
@@ -141,12 +107,12 @@ impl Cluster {
                 if elapsed >= timeout {
                     remaining_timeout = timeout;
                     // We drive Raft every 100ms.
-                    raft.tick();
+                    // TODO raft tick
                 } else {
                     remaining_timeout -= elapsed;
                 }
 
-                on_ready(&mut raft, &peer_nodes);
+                // TODO on_ready(..)
             }
         });
 
@@ -154,89 +120,11 @@ impl Cluster {
     }
 }
 
-fn on_ready(raft: &mut RawNode<MemStorage>, peer_nodes: &Vec<Node>) {
-    if !raft.has_ready() {
-        return;
-    }
-
-    let store = raft.raft.raft_log.store.clone();
-
-    // Get the `Ready` with `RawNode::ready` interface.
-    let mut ready = raft.ready();
-
-    let handle_messages = |msgs: &Vec<Message>| {
-        for msg in msgs {
-            // Send messages to other peers.
-            for node in peer_nodes {
-                node.send(&msg);
-            }
-        }
-    };
-
-    // Send out the messages come from the node.
-    handle_messages(&ready.messages);
-
-    if !raft::is_empty_snap(ready.snapshot()) {
-        // This is a snapshot, we need to apply the snapshot at first.
-        store.wl().apply_snapshot(ready.snapshot().clone()).unwrap();
-    }
-
-    let mut handle_committed_entries = |committed_entries: Option<&Vec<Entry>>| {
-        let committed_entries = match committed_entries {
-            Some(committed_entries) => committed_entries,
-            None => return,
-        };
-
-        let mut last_apply_index = 0;
-        for entry in committed_entries {
-            last_apply_index = handle_entry(entry);
-        }
-    };
-
-    handle_committed_entries(ready.committed_entries.as_ref());
-
-    if !ready.entries().is_empty() {
-        // Append entries to the Raft log.
-        store.wl().append(ready.entries()).unwrap();
-    }
-
-    if let Some(hs) = ready.hs() {
-        // Raft HardState changed, and we need to persist it.
-        store.wl().set_hardstate(hs.clone());
-    }
-
-    if let Some(committed_entries) = ready.committed_entries.take() {
-        let mut last_apply_index = 0;
-        for entry in committed_entries.iter() {
-            last_apply_index = handle_entry(entry);
-        }
-    }
-
-    raft.advance(ready);
-}
-
-fn handle_entry(entry: &Entry) -> u64 {
-    // Mostly, you need to save the last apply index to resume applying
-    // after restart. Here we just ignore this because we use a Memory storage.
-    let last_apply_index = entry.get_index();
-
-    if entry.get_data().is_empty() {
-        // Emtpy entry, when the peer becomes Leader it will send an empty entry.
-        return last_apply_index;
-    }
-
-    match entry.get_entry_type() {
-        EntryType::EntryNormal => {}     // TODO handle normal entry
-        EntryType::EntryConfChange => {} // TODO handle conf change
-    };
-
-    last_apply_index
-}
-
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::thread;
+    use std::time::Duration;
 
     use rand::{thread_rng, RngCore};
 
