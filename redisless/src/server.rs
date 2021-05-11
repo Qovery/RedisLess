@@ -474,6 +474,8 @@ mod tests {
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
+
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
     #[test]
@@ -501,6 +503,8 @@ mod tests {
 
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "value2");
+        
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
     #[test]
     #[serial]
@@ -526,6 +530,8 @@ mod tests {
         assert_eq!(x, "val2");
         let x: String = con.get("key3").unwrap();
         assert_eq!(x, "val3");
+        
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
     #[test]
