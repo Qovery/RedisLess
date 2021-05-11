@@ -1,9 +1,12 @@
-use super::RedisError;
 use std::{
     fmt::{Display, Formatter},
     num::ParseIntError,
     str::Utf8Error,
 };
+
+use crate::storage::in_memory::TimeOverflow;
+
+use super::RedisError;
 
 #[derive(Debug)]
 pub enum RedisCommandError {
@@ -22,7 +25,6 @@ pub enum RedisCommandError {
     CommandNotFound,
 }
 
-use storage::in_memory::TimeOverflow;
 impl Display for RedisCommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -47,16 +49,19 @@ impl From<TimeOverflow> for RedisCommandError {
         Self::TimeOverflow(err)
     }
 }
+
 impl From<Utf8Error> for RedisCommandError {
     fn from(err: Utf8Error) -> Self {
         Self::BadString(err)
     }
 }
+
 impl From<ParseIntError> for RedisCommandError {
     fn from(err: ParseIntError) -> Self {
         Self::IntParse(err)
     }
 }
+
 impl From<()> for RedisCommandError {
     fn from(_: ()) -> Self {
         Self::ArgNumber

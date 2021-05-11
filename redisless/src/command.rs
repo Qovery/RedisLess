@@ -1,5 +1,7 @@
 use crate::protocol::Resp;
-use storage::in_memory::Expiry;
+use crate::storage::in_memory::Expiry;
+
+use super::protocol::error::RedisCommandError;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -25,8 +27,6 @@ fn get_bytes_vec(resp: Option<&Resp>) -> Option<Vec<u8>> {
         _ => None,
     }
 }
-
-use super::protocol::error::RedisCommandError;
 
 impl Command {
     pub fn parse(v: Vec<Resp>) -> Result<Self, RedisCommandError> {
