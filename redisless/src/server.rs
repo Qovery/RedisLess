@@ -392,7 +392,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_redis_implementation() {
-        let port = 3336;
+        let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
 
         assert_eq!(server.start(), Some(ServerState::Started)); // this fails
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     #[serial]
     fn expire() {
-        let port = 3335;
+        let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
 
@@ -510,7 +510,7 @@ mod tests {
     #[serial]
     fn mset_nx() {
         // make these first 5 lines into a macro?
-        let port = 3348;
+        let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
@@ -537,15 +537,14 @@ mod tests {
     #[test]
     #[serial]
     fn start_and_stop_server() {
-        let server = Server::new(InMemoryStorage::new(), 3333);
+        let server = Server::new(InMemoryStorage::new(), 3340);
         assert_eq!(server.start(), Some(ServerState::Started));
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
     #[test]
     fn start_and_stop_server_multiple_times() {
-        let server = Server::new(InMemoryStorage::new(), 3334);
-
+        let server = Server::new(InMemoryStorage::new(), 3341);
         for _ in 0..9 {
             assert_eq!(server.start(), Some(ServerState::Started));
             assert_eq!(server.stop(), Some(ServerState::Stopped));
