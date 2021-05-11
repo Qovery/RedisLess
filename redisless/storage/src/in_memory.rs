@@ -113,6 +113,13 @@ impl Storage for InMemoryStorage {
             None => 0,
         }
     }
+
+    fn contains(&mut self, key: &[u8]) -> u32 {
+        match self.data_mapper.contains_key(key) {
+            true => 1,
+            false => 0,
+        }
+    }
 }
 
 #[cfg(test)]

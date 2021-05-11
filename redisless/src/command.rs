@@ -15,6 +15,7 @@ pub enum Command {
     GetSet(Key, Value),
     Del(Key),
     Incr(Key),
+    Exists(Key),
     Info,
     Ping,
     Quit,
@@ -87,6 +88,10 @@ impl Command {
                 b"INCR" | b"incr" | b"Incr" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Incr(key))
+                }
+                b"EXISTS" | b"exists" | b"Exists" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Exists(key))
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Ping),

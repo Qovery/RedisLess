@@ -187,16 +187,16 @@ fn run_command_and_get_response<T: Storage>(
                 None => protocol::NIL.to_vec(),
             },
             Command::GetSet(k, v) => {
-                let mut storage_lock = lock_then_release(storage);
+                let mut storage = lock_then_release(storage);
 
-                let response = match storage_lock.read(k.as_slice()) {
+                let response = match storage.read(k.as_slice()) {
                     Some(value) => {
                         let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
                         res.as_bytes().to_vec()
                     }
                     None => protocol::NIL.to_vec(),
                 };
-                storage_lock.write(k.as_slice(), v.as_slice());
+                storage.write(k.as_slice(), v.as_slice());
                 response
             }
             Command::Del(k) => {
@@ -226,6 +226,10 @@ fn run_command_and_get_response<T: Storage>(
                         format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
+            }
+            Command::Exists(k) => {
+                let exists  = lock_then_release(storage).contains(k);
+                format!(":{}\r\n", exists).as_bytes().to_vec()
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
@@ -368,11 +372,15 @@ mod tests {
         let mut con = redis_client.get_connection().unwrap();
 
         let _: () = con.set("key", "value").unwrap();
+        let exists: bool = con.exists("key").unwrap();
+        assert_eq!(exists, true);
         let x: String = con.get("key").unwrap();
         assert_eq!(x, "value");
 
         let x: RedisResult<String> = con.get("not-existing-key");
         assert_eq!(x.is_err(), true);
+        let exists: bool = con.exists("non-existant-key").unwrap();
+        assert_eq!(exists, false);
 
         let x: u32 = con.del("key").unwrap();
         assert_eq!(x, 1);
