@@ -57,8 +57,3 @@ impl From<ParseIntError> for RedisCommandError {
         Self::IntParse(err)
     }
 }
-impl From<()> for RedisCommandError {
-    fn from(_: ()) -> Self {
-        Self::ArgNumber
-    }
-}
