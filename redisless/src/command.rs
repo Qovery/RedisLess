@@ -1,5 +1,5 @@
-use crate::protocol::Resp;
 use crate::protocol::error::RedisCommandError;
+use crate::protocol::Resp;
 use storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
@@ -28,7 +28,7 @@ fn get_bytes_vec(resp: Option<&Resp>) -> Result<Vec<u8>, RedisCommandError> {
     }
 }
 
-fn parse_duration(bytes: Vec<u8>)  -> Result<u64, RedisCommandError> {
+fn parse_duration(bytes: Vec<u8>) -> Result<u64, RedisCommandError> {
     let duration = std::str::from_utf8(&bytes[..])?;
     Ok(duration.parse::<u64>()?)
 }
@@ -37,7 +37,7 @@ impl Command {
     pub fn parse(v: Vec<Resp>) -> Result<Self, RedisCommandError> {
         use Command::*;
         use RedisCommandError::*;
-        
+
         match v.first() {
             Some(Resp::BulkString(command)) => match *command {
                 b"SET" | b"set" | b"Set" => {
@@ -48,8 +48,7 @@ impl Command {
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))
-                        .and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
                     let value = get_bytes_vec(v.get(3))?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
@@ -57,16 +56,14 @@ impl Command {
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))
-                        .and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Expire(key, expiry))
                 }
                 b"PEXPIRE" | b"Pexpire" | b"PExpire" | b"pexpire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2))
-                        .and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
                     let expiry = Expiry::new_from_millis(duration)?;
 
                     Ok(PExpire(key, expiry))

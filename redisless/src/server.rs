@@ -228,7 +228,7 @@ fn run_command_and_get_response<T: Storage>(
                 }
             }
             Command::Exists(k) => {
-                let exists  = lock_then_release(storage).contains(k);
+                let exists = lock_then_release(storage).contains(k);
                 format!(":{}\r\n", exists).as_bytes().to_vec()
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
