@@ -65,7 +65,7 @@ impl Command {
                     let value = get_bytes_vec(v.get(3))?;
                     let expiry = Expiry::new_from_millis(duration)?;
 
-                    Ok(Setex(key, expiry, value))
+                    Ok(PSetex(key, expiry, value))
                 }
                 b"MSET" | b"MSet" | b"mset" => {
                     // Will not panic with out of bounds, because request has at least length 1,
