@@ -187,6 +187,11 @@ fn run_command_and_get_response<T: Storage>(
                     }
                 }
             }
+            Command::MSet(items) => {
+                let mut storage = lock_then_release(storage);
+                items.iter().for_each(|(k, v)| storage.write(k, v));
+                protocol::OK.to_vec()
+            }
             Command::MSetnx(items) => {
                 // Either set all or not set any at all if any already exist
                 let mut storage = lock_then_release(storage);
@@ -506,9 +511,10 @@ mod tests {
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
+
     #[test]
     #[serial]
-    fn mset_nx() {
+    fn mset() {
         // make these first 5 lines into a macro?
         let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);

@@ -11,6 +11,7 @@ pub enum Command {
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
+    MSet(Items),
     MSetnx(Items),
     Expire(Key, Expiry),
     PExpire(Key, Expiry),
@@ -57,11 +58,30 @@ impl Command {
 
                     Ok(Setex(key, expiry, value))
                 }
-                b"MSETNX" | b"MSetnx" | b"msetnx" => {
+                b"MSET" | b"MSet" | b"mset" => {
                     // Will not panic with out of bounds, because request has at least length 1,
                     // in which case request will be an empty slice
                     // &[key, value, key, value, key, value, ...] should be even in length
                     // We want [(key, value), (key, value), (key, value), ..]
+                    let pairs = &v[1..];
+                    let chunk_size = 2_usize;
+                    if pairs.is_empty() || pairs.len() % chunk_size != 0 {
+                        return Err(ArgNumber);
+                    }
+                    let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
+                    for pair in pairs.chunks(chunk_size) {
+                        match pair {
+                            [key, value] => {
+                                let key = get_bytes_vec(Some(&key))?;
+                                let value = get_bytes_vec(Some(&value))?;
+                                items.push((key, value));
+                            }
+                            _ => unreachable!(), // pairs has even length so each chunk will have len 2
+                        }
+                    }
+                    Ok(MSet(items))
+                }
+                b"MSETNX" | b"MSetnx" | b"msetnx" => {
                     let pairs = &v[1..];
 
                     let chunk_size = 2_usize;
@@ -77,7 +97,7 @@ impl Command {
                                 let value = get_bytes_vec(Some(&value))?;
                                 items.push((key, value));
                             }
-                            _ => unreachable!(), // pairs has even length so each chunk will have len 2
+                            _ => unreachable!(),
                         }
                     }
                     Ok(MSetnx(items))
