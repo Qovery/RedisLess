@@ -111,7 +111,7 @@ impl Command {
                             _ => unreachable!(),
                         }
                     }
-                    
+
                     Ok(MSetnx(items))
                 }
                 b"SETNX" | b"setnx" | b"Setnx" => {
@@ -147,7 +147,7 @@ impl Command {
                 b"MGET" | b"mget" | b"MGet" => {
                     let keys = &v[1..];
                     if keys.is_empty() {
-                        return Err(ArgNumber)
+                        return Err(ArgNumber);
                     }
 
                     let mut keys_vec = Keys::with_capacity(keys.len());

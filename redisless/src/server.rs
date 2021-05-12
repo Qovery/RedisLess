@@ -167,8 +167,7 @@ fn run_command_and_get_response<T: Storage>(
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
-            Command::Setex(k, expiry, v)
-            | Command::PSetex(k, expiry, v) => {
+            Command::Setex(k, expiry, v) | Command::PSetex(k, expiry, v) => {
                 let mut storage = lock_then_release(storage);
 
                 storage.write(k.as_slice(), v.as_slice());
@@ -234,14 +233,14 @@ fn run_command_and_get_response<T: Storage>(
                 // Draft, slow ?
                 // better to add a response formatter module?
                 let mut storage = lock_then_release(storage);
-                let mut final_response  = format!("*{}\r\n", keys.len());
+                let mut final_response = format!("*{}\r\n", keys.len());
 
                 for key in keys {
                     let response_line = match storage.read(key.as_slice()) {
                         Some(value) => {
                             format!("+{}\r\n", std::str::from_utf8(value).unwrap())
                         }
-                        None => "$-1\r\n".to_string()
+                        None => "$-1\r\n".to_string(),
                     };
                     final_response.push_str(response_line.as_str());
                 }
@@ -551,8 +550,7 @@ mod tests {
 
         let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
 
-        let _ = con
-            .set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
+        let _ = con.set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
 
         let x: String = con.get("key1").unwrap();
         assert_eq!(x, "val1");
@@ -612,9 +610,8 @@ mod tests {
 
         let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
-        let _ = con
-            .set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
-        
+        let _ = con.set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
+
         let keys = vec!["key0", "key1", "key2"];
         let exes: Vec<String> = con.get(keys).unwrap();
         assert_eq!(exes[0], "val0");
