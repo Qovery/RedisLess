@@ -516,26 +516,60 @@ mod tests {
     #[serial]
     fn mset() {
         // make these first 5 lines into a macro?
-        let port = 3340;
+        let port = 3342;
         let server = Server::new(InMemoryStorage::new(), port);
-        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
+        assert_eq!(server.start(), Some(ServerState::Started));
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        // what should happen if keys are repeated in the request? currently the last one is the one  that is set
-        // i think the official redis implementation behaves this way as well?
         let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
 
-        let x = con
-            .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
-            .unwrap();
-        assert_eq!(x, 1);
+        let _ = con
+            .set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
+
         let x: String = con.get("key1").unwrap();
         assert_eq!(x, "val1");
         let x: String = con.get("key2").unwrap();
         assert_eq!(x, "val2");
         let x: String = con.get("key3").unwrap();
         assert_eq!(x, "val3");
+
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
+    }
+
+    #[test]
+    #[serial]
+    fn mset_nx() {
+        let port = 3342;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
+
+        let x = con
+            .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
+            .unwrap();
+        assert_eq!(x, 1);
+
+        let x: String = con.get("key1").unwrap();
+        assert_eq!(x, "val1");
+        let x: String = con.get("key2").unwrap();
+        assert_eq!(x, "val2");
+        let x: String = con.get("key3").unwrap();
+        assert_eq!(x, "val3");
+
+        let x = con
+            .mset_nx::<&'static str, &'static str, u32>(
+                &[("key4", "value4"), ("key1", "value5")][..],
+            )
+            .unwrap();
+        assert_eq!(x, 0); // A key was repeated
+        let x: String = con.get("key1").unwrap();
+        assert_eq!(x, "val1"); // key1 should still be val1
+        let x: Option<String> = con.get("key4").ok();
+        assert_eq!(x, None); // key4 should not have been set
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
