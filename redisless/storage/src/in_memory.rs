@@ -114,16 +114,13 @@ impl Storage for InMemoryStorage {
         }
     }
 
-    fn value_type(&mut self, key: &[u8]) -> String {
-        if let Some(data_type) = self.data_mapper.get(key) {
-            match data_type {
-                DataType::String => format!("string"),
-                DataType::List => format!("list"),
-                DataType::Set => format!("set"),
-                DataType::Hash => format!("hash"),
-            }
-        } else {
-            format!("none")
+    fn value_type(&mut self, key: &[u8]) -> &str {
+        match self.data_mapper.get(key) {
+            Some(DataType::String) => "string",
+            Some(DataType::List) => "list",
+            Some(DataType::Set) => "set",
+            Some(DataType::Hash) => "hash",
+            None => "none",
         }
     }
 }

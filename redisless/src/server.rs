@@ -228,8 +228,9 @@ fn run_command_and_get_response<T: Storage>(
                 }
             }
             Command::Type(k) => {
-                let value_type = lock_then_release(storage).value_type(k.as_slice());
-                value_type.as_bytes().to_vec()
+                let mut s = lock_then_release(storage);
+                let value_type = s.value_type(k.as_slice());
+                format!("+{}\r\n", value_type).as_bytes().to_vec()
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
@@ -354,7 +355,7 @@ fn start_server<T: Storage + Send + 'static>(
 mod tests {
     use std::{thread::sleep, time::Duration};
 
-    use redis::{Commands, RedisResult, ToRedisArgs, cmd};
+    use redis::{cmd, Commands, RedisResult};
     use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
@@ -397,36 +398,6 @@ mod tests {
         assert_eq!(x, 11u32);
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
-    }
-
-    #[test]
-    #[serial]
-    fn test_type_command() {
-        let port = 3336;
-        let server = Server::new(InMemoryStorage::new(), port);
-        assert_eq!(server.start(), Some(ServerState::Started));
-        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-        let mut con = redis_client.get_connection().unwrap();
-
-        let _: () = con.set("keyA", "some_value_in_string").unwrap();
-
-        // how do you test new commands?
-        let type_cmd = {
-            let mut args = vec![];
-            args.extend("TYPE".to_redis_args());
-            args.extend("keyA".to_redis_args());
-            let cmd = redis::pack_command(&args);
-            cmd
-        };
-        let _ = con.send_packed_command(&type_cmd);
-        let response_value = con.recv_response();
-        println!("{:?}", response_value);
-        // Err(parse error: Parse error at 1
-        // Unexpected `116`
-        // Unexpected `115`
-        // )
-
-        // assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 
     #[test]
