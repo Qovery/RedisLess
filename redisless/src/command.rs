@@ -11,6 +11,7 @@ pub enum Command {
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
+    PSetex(Key, Expiry, Value),
     MSet(Items),
     MSetnx(Items),
     Expire(Key, Expiry),
@@ -55,6 +56,14 @@ impl Command {
                     let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let value = get_bytes_vec(v.get(3))?;
                     let expiry = Expiry::new_from_secs(duration)?;
+
+                    Ok(Setex(key, expiry, value))
+                }
+                b"PSETEX" | b"psetex" | b"PSetEx" | b"PSetex" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
+                    let value = get_bytes_vec(v.get(3))?;
+                    let expiry = Expiry::new_from_millis(duration)?;
 
                     Ok(Setex(key, expiry, value))
                 }

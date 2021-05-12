@@ -167,7 +167,8 @@ fn run_command_and_get_response<T: Storage>(
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 protocol::OK.to_vec()
             }
-            Command::Setex(k, expiry, v) => {
+            Command::Setex(k, expiry, v)
+            | Command::PSetex(k, expiry, v) => {
                 let mut storage = lock_then_release(storage);
 
                 storage.write(k.as_slice(), v.as_slice());
@@ -478,6 +479,14 @@ mod tests {
 
         sleep(Duration::from_secs(duration as u64));
         let x: Option<String> = con.get("key").ok();
+        assert_eq!(x, None);
+
+        let duration = 1984_usize;
+        let _: () = con.pset_ex("key3", "value3", duration).unwrap();
+        let x: String = con.get("key3").unwrap();
+        assert_eq!(x, "value3");
+        sleep(Duration::from_millis(duration as u64));
+        let x: Option<String> = con.get("key3").ok();
         assert_eq!(x, None);
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
