@@ -51,30 +51,36 @@ impl Command {
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let value = get_bytes_vec(v.get(3))?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Setex(key, expiry, value))
                 }
                 b"MSETNX" | b"MSetnx" | b"msetnx" => {
-                    // Draft implementation
-                    // Will panic if msetnx has somehow been called with no args, fix later
-                    // Maybe do something like split and grab the right partition which should be if it's empty
-                    let request = &v[1..]; // [key, value, key, value, key, value, ...] assuming it's even
-                    let mut items_vec = Vec::<(Key, Value)>::new();
-                    // Now need to map every key value pair into its own iter
-                    for key_value in request.chunks(2) {
-                        match key_value {
+                    // Will not panic with out of bounds, because request has at least length 1,
+                    // in which case request will be an empty slice
+                    // &[key, value, key, value, key, value, ...] should be even in length
+                    // We want [(key, value), (key, value), (key, value), ..]
+                    let pairs = &v[1..];
+
+                    let chunk_size = 2_usize;
+                    if pairs.is_empty() || pairs.len() % chunk_size != 0 {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
+                    for pair in pairs.chunks(chunk_size) {
+                        match pair {
                             [key, value] => {
                                 let key = get_bytes_vec(Some(&key))?;
                                 let value = get_bytes_vec(Some(&value))?;
-                                items_vec.push((key, value));
+                                items.push((key, value));
                             }
-                            _ => return Err(ArgNumber),
+                            _ => unreachable!(), // pairs has even length so each chunk will have len 2
                         }
                     }
-                    Ok(MSetnx(items_vec))
+                    Ok(MSetnx(items))
                 }
                 b"SETNX" | b"setnx" | b"Setnx" => {
                     let key = get_bytes_vec(v.get(1))?;
@@ -84,14 +90,14 @@ impl Command {
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
                     Ok(Expire(key, expiry))
                 }
                 b"PEXPIRE" | b"Pexpire" | b"PExpire" | b"pexpire" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let duration = get_bytes_vec(v.get(2)).and_then(|b| parse_duration(b))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let expiry = Expiry::new_from_millis(duration)?;
 
                     Ok(PExpire(key, expiry))
