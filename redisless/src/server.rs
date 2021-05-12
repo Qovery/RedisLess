@@ -230,6 +230,23 @@ fn run_command_and_get_response<T: Storage>(
                 storage.write(k.as_slice(), v.as_slice());
                 response
             }
+            Command::MGet(keys) => {
+                // Draft, slow ?
+                // better to add a response formatter module?
+                let mut storage = lock_then_release(storage);
+                let mut final_response  = format!("*{}\r\n", keys.len());
+
+                for key in keys {
+                    let response_line = match storage.read(key.as_slice()) {
+                        Some(value) => {
+                            format!("+{}\r\n", std::str::from_utf8(value).unwrap())
+                        }
+                        None => "$-1\r\n".to_string()
+                    };
+                    final_response.push_str(response_line.as_str());
+                }
+                final_response.as_bytes().to_vec()
+            }
             Command::Del(k) => {
                 let total_del = lock_then_release(storage).remove(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
@@ -389,6 +406,7 @@ fn start_server<T: Storage + Send + 'static>(
 mod tests {
     use std::{thread::sleep, time::Duration};
 
+    use rayon::vec;
     use redis::{cmd, Commands, RedisResult};
     use storage::in_memory::InMemoryStorage;
 
@@ -580,6 +598,37 @@ mod tests {
         let x: Option<String> = con.get("key4").ok();
         assert_eq!(x, None); // key4 should not have been set
 
+        assert_eq!(server.stop(), Some(ServerState::Stopped));
+    }
+
+    #[test]
+    #[serial]
+    fn mget() {
+        let port = 3342;
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let mut con = redis_client.get_connection().unwrap();
+
+        let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
+
+        let _ = con
+            .set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
+        
+        let keys = vec!["key0", "key1", "key2"];
+        let exes: Vec<String> = con.get(keys).unwrap();
+        assert_eq!(exes[0], "val0");
+        assert_eq!(exes[1], "val1");
+        assert_eq!(exes[2], "val2");
+
+        let _: u32 = con.del("key0").unwrap();
+        let _: u32 = con.del("key1").unwrap();
+
+        let keys = vec!["key0", "key1", "key2"];
+        let new_exes: Vec<Option<String>> = con.get(keys).unwrap();
+        assert_eq!(new_exes[0], None);
+        assert_eq!(new_exes[1], None);
+        assert_eq!(new_exes[2], Some("val2".to_string()));
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 

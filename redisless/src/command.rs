@@ -5,6 +5,7 @@ use storage::in_memory::Expiry;
 type Key = Vec<u8>;
 type Value = Vec<u8>;
 type Items = Vec<(Key, Value)>;
+type Keys = Vec<Key>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -18,6 +19,7 @@ pub enum Command {
     PExpire(Key, Expiry),
     Get(Key),
     GetSet(Key, Value),
+    MGet(Keys),
     Del(Key),
     Incr(Key),
     Exists(Key),
@@ -98,7 +100,7 @@ impl Command {
                         return Err(ArgNumber);
                     }
 
-                    let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
+                    let mut items = Items::with_capacity(pairs.len());
                     for pair in pairs.chunks(chunk_size) {
                         match pair {
                             [key, value] => {
@@ -109,6 +111,7 @@ impl Command {
                             _ => unreachable!(),
                         }
                     }
+                    
                     Ok(MSetnx(items))
                 }
                 b"SETNX" | b"setnx" | b"Setnx" => {
@@ -140,6 +143,20 @@ impl Command {
                     let value = get_bytes_vec(v.get(2))?;
 
                     Ok(GetSet(key, value))
+                }
+                b"MGET" | b"mget" | b"MGet" => {
+                    let keys = &v[1..];
+                    if keys.is_empty() {
+                        return Err(ArgNumber)
+                    }
+
+                    let mut keys_vec = Keys::with_capacity(keys.len());
+                    for key in keys {
+                        let key = get_bytes_vec(Some(key))?;
+                        keys_vec.push(key);
+                    }
+
+                    Ok(MGet(keys_vec))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
