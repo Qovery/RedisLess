@@ -18,14 +18,14 @@ impl Expiry {
         Instant::now()
             .checked_add(Duration::from_millis(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 
     pub fn new_from_secs(duration: u64) -> Result<Self, TimeOverflow> {
         Instant::now()
             .checked_add(Duration::from_secs(duration))
             .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow{})
+            .ok_or(TimeOverflow {})
     }
 }
 
@@ -160,7 +160,7 @@ mod tests {
             assert_eq!(mem.read(b"key"), None);
         }
     }
-    
+
     #[test]
     fn contains() {
         let mut mem = InMemoryStorage::new();
