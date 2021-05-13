@@ -25,9 +25,9 @@ the [Redis](https://redis.io/topics/introduction) API.**
 > That's the idea behind RedisLess, a lightweight, embedded, and scalable in-memory Key/Value store library compatible with the Redis API.
 
 Read more about RedisLess:
-* Apr 28 2021: The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
-* May 03 2021: [Interesting discussion about RedisLess](https://www.reddit.com/r/rust/comments/n3d1zw/i_am_building_a_serverless_version_of_redis/) on Reddit.
 * May 13 2021: [How I imagine the future of databases in the Cloud](https://www.heapstack.sh/how-i-imagine-the-future-of-databases-in-the-cloud)
+* May 03 2021: [Interesting discussion about RedisLess](https://www.reddit.com/r/rust/comments/n3d1zw/i_am_building_a_serverless_version_of_redis/) on Reddit.
+* Apr 28 2021: The RedisLess project was initially announced [here](https://www.heapstack.sh/redisless-blazingly-fast-serverless-redis).
 
 # How to use it?
 
