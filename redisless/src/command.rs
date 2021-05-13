@@ -5,17 +5,21 @@ use crate::storage::in_memory::Expiry;
 type Key = Vec<u8>;
 type Value = Vec<u8>;
 type Items = Vec<(Key, Value)>;
+type Keys = Vec<Key>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
+    PSetex(Key, Expiry, Value),
+    MSet(Items),
     MSetnx(Items),
     Expire(Key, Expiry),
     PExpire(Key, Expiry),
     Get(Key),
     GetSet(Key, Value),
+    MGet(Keys),
     Del(Key),
     Incr(Key),
     Exists(Key),
@@ -57,20 +61,27 @@ impl Command {
 
                     Ok(Setex(key, expiry, value))
                 }
-                b"MSETNX" | b"MSetnx" | b"msetnx" => {
+                b"PSETEX" | b"psetex" | b"PSetEx" | b"PSetex" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
+                    let value = get_bytes_vec(v.get(3))?;
+                    let expiry = Expiry::new_from_millis(duration)?;
+
+                    Ok(PSetex(key, expiry, value))
+                }
+                b"MSET" | b"MSet" | b"mset" => {
                     // Will not panic with out of bounds, because request has at least length 1,
                     // in which case request will be an empty slice
                     // &[key, value, key, value, key, value, ...] should be even in length
                     // We want [(key, value), (key, value), (key, value), ..]
                     let pairs = &v[1..];
-
                     let chunk_size = 2_usize;
                     if pairs.is_empty() || pairs.len() % chunk_size != 0 {
                         return Err(ArgNumber);
                     }
 
                     let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
-                    for pair in pairs.chunks(chunk_size) {
+                    for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
                                 let key = get_bytes_vec(Some(&key))?;
@@ -80,6 +91,28 @@ impl Command {
                             _ => unreachable!(), // pairs has even length so each chunk will have len 2
                         }
                     }
+                    Ok(MSet(items))
+                }
+                b"MSETNX" | b"MSetnx" | b"msetnx" => {
+                    let pairs = &v[1..];
+
+                    let chunk_size = 2_usize;
+                    if pairs.is_empty() || pairs.len() % chunk_size != 0 {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut items = Items::with_capacity(pairs.len());
+                    for pair in pairs.chunks_exact(chunk_size) {
+                        match pair {
+                            [key, value] => {
+                                let key = get_bytes_vec(Some(&key))?;
+                                let value = get_bytes_vec(Some(&value))?;
+                                items.push((key, value));
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
                     Ok(MSetnx(items))
                 }
                 b"SETNX" | b"setnx" | b"Setnx" => {
@@ -111,6 +144,20 @@ impl Command {
                     let value = get_bytes_vec(v.get(2))?;
 
                     Ok(GetSet(key, value))
+                }
+                b"MGET" | b"mget" | b"MGet" => {
+                    let keys = &v[1..]; // will never panic
+                    if keys.is_empty() {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut keys_vec = Keys::with_capacity(keys.len());
+                    for key in keys {
+                        let key = get_bytes_vec(Some(key))?;
+                        keys_vec.push(key);
+                    }
+
+                    Ok(MGet(keys_vec))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
