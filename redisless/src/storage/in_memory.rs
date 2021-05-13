@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::Storage;
+use crate::storage::Storage;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Expiry {
@@ -123,8 +123,8 @@ impl Storage for InMemoryStorage {
 mod tests {
     use std::{thread::sleep, time::Duration};
 
-    use crate::in_memory::{Expiry, InMemoryStorage};
-    use crate::Storage;
+    use crate::storage::in_memory::{Expiry, InMemoryStorage};
+    use crate::storage::Storage;
 
     #[test]
     fn test_in_memory_storage() {
@@ -166,8 +166,8 @@ mod tests {
         let mut mem = InMemoryStorage::new();
         mem.write(b"key1", b"value1");
         let x = mem.contains(b"key1");
-        assert_eq!(x, 1);
+        assert_eq!(x, true);
         let x = mem.contains(b"key2");
-        assert_eq!(x, 0);
+        assert_eq!(x, false);
     }
 }

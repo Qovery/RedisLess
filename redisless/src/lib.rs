@@ -6,9 +6,12 @@ use storage::in_memory::InMemoryStorage;
 
 use crate::server::{Server, ServerState};
 
+mod cluster;
 mod command;
+mod error;
 mod protocol;
 pub mod server;
+pub mod storage;
 
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_new(port: u16) -> *mut Server {

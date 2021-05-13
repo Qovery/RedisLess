@@ -6,10 +6,11 @@ use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
-use storage::Storage;
 
+use crate::cluster::peer::PeersDiscovery;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, Resp};
+use crate::storage::Storage;
 use crate::{command::Command, protocol::error::RedisCommandError};
 
 type CloseConnection = bool;
@@ -18,6 +19,7 @@ type CommandResponse = Vec<u8>;
 
 pub struct Server {
     server_state_bus: MPB<ServerState>,
+    cluster_options: ServerClusterOptions,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -30,10 +32,43 @@ pub enum ServerState {
     Error(String),
 }
 
+#[derive(Debug)]
+pub struct ServerClusterOptions {
+    group_id: String,
+    peers_discovery: PeersDiscovery,
+}
+
+impl ServerClusterOptions {
+    pub fn new(group_id: String, peers_discovery: PeersDiscovery) -> Self {
+        ServerClusterOptions {
+            group_id,
+            peers_discovery,
+        }
+    }
+}
+
+impl Default for ServerClusterOptions {
+    fn default() -> Self {
+        ServerClusterOptions {
+            group_id: String::from("primary"),
+            peers_discovery: PeersDiscovery::Automatic,
+        }
+    }
+}
+
 impl Server {
     pub fn new<T: Storage + Send + 'static>(storage: T, port: u16) -> Self {
+        Server::new_with_options(storage, ServerClusterOptions::default(), port)
+    }
+
+    pub fn new_with_options<T: Storage + Send + 'static>(
+        storage: T,
+        cluster_options: ServerClusterOptions,
+        port: u16,
+    ) -> Self {
         let s = Server {
             server_state_bus: MPB::new(),
+            cluster_options,
         };
 
         s._init_configuration(format!("0.0.0.0:{}", port), storage);
@@ -405,9 +440,9 @@ fn start_server<T: Storage + Send + 'static>(
 mod tests {
     use redis::{cmd, Commands, RedisResult};
     use std::{thread::sleep, time::Duration};
-    use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
+    use crate::storage::in_memory::InMemoryStorage;
     use crate::Server;
 
     #[test]
@@ -521,7 +556,7 @@ mod tests {
     #[test]
     #[serial]
     fn get_set() {
-        let port = 3340;
+        let port = 3332;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started));
 
@@ -551,7 +586,7 @@ mod tests {
     #[serial]
     fn mset() {
         // make these first 5 lines into a macro?
-        let port = 3342;
+        let port = 3343;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started));
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();

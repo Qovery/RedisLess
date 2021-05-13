@@ -1,6 +1,6 @@
 use crate::protocol::error::RedisCommandError;
 use crate::protocol::Resp;
-use storage::in_memory::Expiry;
+use crate::storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
