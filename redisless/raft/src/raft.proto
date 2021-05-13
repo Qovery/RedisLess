@@ -1,0 +1,48 @@
+syntax = "proto2";
+
+package raft.protobufs;
+
+message RaftMessage {
+    required TermId term = 2;
+    oneof rpc {
+        VoteRequest vote_request = 3;
+        VoteResponse vote_response = 4;
+        AppendRequest append_request = 5;
+        AppendResponse append_response = 6;
+    };
+}
+
+message VoteRequest {
+    required LogIndex last_log_idx = 2;
+    required TermId last_log_term = 3;
+}
+
+message VoteResponse {
+    required bool vote_granted = 2;
+}
+
+message AppendRequest {
+    required LogIndex prev_log_idx = 1;
+    required TermId prev_log_term = 2;
+    required LogIndex leader_commit = 3;
+    repeated LogEntry entries = 4;
+}
+
+message AppendResponse {
+    required bool success = 1;
+    required LogIndex match_idx = 2;
+    required LogIndex last_log_idx = 3;
+}
+
+message LogEntry {
+    required TermId term = 1;
+    required bytes data = 2;
+}
+
+message TermId {
+    required uint64 id = 1;
+}
+
+message LogIndex {
+    required uint64 id = 1;
+}
