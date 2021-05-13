@@ -122,6 +122,8 @@ impl Storage for InMemoryStorage {
             Some(DataType::Hash) => "hash",
             None => "none",
         }
+    }
+
     fn contains(&mut self, key: &[u8]) -> bool {
         self.data_mapper.contains_key(key)
     }

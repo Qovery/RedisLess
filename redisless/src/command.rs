@@ -126,8 +126,8 @@ impl Command {
                     Ok(Exists(key))
                 }
                 b"TYPE" | b"type" | b"Type" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    Ok(Command::Type(key))
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Type(key))
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Ping),
