@@ -122,6 +122,8 @@ impl Storage for InMemoryStorage {
             Some(DataType::Hash) => "hash",
             None => "none",
         }
+    fn contains(&mut self, key: &[u8]) -> bool {
+        self.data_mapper.contains_key(key)
     }
 }
 
@@ -165,5 +167,15 @@ mod tests {
             sleep(Duration::from_millis(duration));
             assert_eq!(mem.read(b"key"), None);
         }
+    }
+    
+    #[test]
+    fn contains() {
+        let mut mem = InMemoryStorage::new();
+        mem.write(b"key1", b"value1");
+        let x = mem.contains(b"key1");
+        assert_eq!(x, 1);
+        let x = mem.contains(b"key2");
+        assert_eq!(x, 0);
     }
 }

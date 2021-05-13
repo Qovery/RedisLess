@@ -8,4 +8,5 @@ pub trait Storage {
     fn read(&mut self, key: &[u8]) -> Option<&[u8]>;
     fn remove(&mut self, key: &[u8]) -> u32;
     fn value_type(&mut self, key: &[u8]) -> &str;
+    fn contains(&mut self, key: &[u8]) -> bool;
 }

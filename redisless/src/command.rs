@@ -1,13 +1,17 @@
+use crate::protocol::error::RedisCommandError;
 use crate::protocol::Resp;
 use storage::in_memory::Expiry;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
+type Items = Vec<(Key, Value)>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Set(Key, Value),
+    Setnx(Key, Value),
     Setex(Key, Expiry, Value),
+    MSetnx(Items),
     Expire(Key, Expiry),
     PExpire(Key, Expiry),
     Get(Key),
@@ -15,87 +19,119 @@ pub enum Command {
     Del(Key),
     Incr(Key),
     Type(Key),
+    Exists(Key),
     Info,
     Ping,
     Quit,
 }
 
-fn get_bytes_vec(resp: Option<&Resp>) -> Option<Vec<u8>> {
+fn get_bytes_vec(resp: Option<&Resp>) -> Result<Vec<u8>, RedisCommandError> {
     match resp {
-        Some(Resp::String(x)) | Some(Resp::BulkString(x)) => Some(x.to_vec()),
-        _ => None,
+        Some(Resp::String(x)) | Some(Resp::BulkString(x)) => Ok(x.to_vec()),
+        _ => Err(RedisCommandError::ArgNumber),
     }
 }
 
-use super::protocol::error::RedisCommandError;
+fn parse_duration(bytes: Vec<u8>) -> Result<u64, RedisCommandError> {
+    let duration = std::str::from_utf8(&bytes[..])?;
+    Ok(duration.parse::<u64>()?)
+}
 
 impl Command {
     pub fn parse(v: Vec<Resp>) -> Result<Self, RedisCommandError> {
+        use Command::*;
         use RedisCommandError::*;
+
         match v.first() {
-            Some(Resp::BulkString(op)) => match *op {
-                // Reorganize ?
+            Some(Resp::BulkString(command)) => match *command {
                 b"SET" | b"set" | b"Set" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    let value = get_bytes_vec(v.get(2)).ok_or(())?;
-                    Ok(Command::Set(key, value))
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(Set(key, value))
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
-                    let value = get_bytes_vec(v.get(3)).ok_or(())?;
-
-                    // Might wanna add a parse duration function
-                    let duration = std::str::from_utf8(&duration[..])?;
-                    let duration = duration.parse::<u64>()?;
+                    let key = get_bytes_vec(v.get(1))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
+                    let value = get_bytes_vec(v.get(3))?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
-                    Ok(Command::Setex(key, expiry, value))
+                    Ok(Setex(key, expiry, value))
+                }
+                b"MSETNX" | b"MSetnx" | b"msetnx" => {
+                    // Will not panic with out of bounds, because request has at least length 1,
+                    // in which case request will be an empty slice
+                    // &[key, value, key, value, key, value, ...] should be even in length
+                    // We want [(key, value), (key, value), (key, value), ..]
+                    let pairs = &v[1..];
+
+                    let chunk_size = 2_usize;
+                    if pairs.is_empty() || pairs.len() % chunk_size != 0 {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
+                    for pair in pairs.chunks(chunk_size) {
+                        match pair {
+                            [key, value] => {
+                                let key = get_bytes_vec(Some(&key))?;
+                                let value = get_bytes_vec(Some(&value))?;
+                                items.push((key, value));
+                            }
+                            _ => unreachable!(), // pairs has even length so each chunk will have len 2
+                        }
+                    }
+                    Ok(MSetnx(items))
+                }
+                b"SETNX" | b"setnx" | b"Setnx" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(Setnx(key, value))
                 }
                 b"EXPIRE" | b"expire" | b"Expire" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
-
-                    let duration = std::str::from_utf8(&duration[..])?;
-                    let duration = duration.parse::<u64>()?;
+                    let key = get_bytes_vec(v.get(1))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let expiry = Expiry::new_from_secs(duration)?;
 
-                    Ok(Command::Expire(key, expiry))
+                    Ok(Expire(key, expiry))
                 }
                 b"PEXPIRE" | b"Pexpire" | b"PExpire" | b"pexpire" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    let duration = get_bytes_vec(v.get(2)).ok_or(())?;
-
-                    let duration = std::str::from_utf8(&duration[..])?;
-                    let duration = duration.parse::<u64>()?;
+                    let key = get_bytes_vec(v.get(1))?;
+                    let duration = get_bytes_vec(v.get(2)).and_then(parse_duration)?;
                     let expiry = Expiry::new_from_millis(duration)?;
 
-                    Ok(Command::PExpire(key, expiry))
+                    Ok(PExpire(key, expiry))
                 }
                 b"GET" | b"get" | b"Get" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    Ok(Command::Get(key))
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Get(key))
                 }
                 b"GETSET" | b"getset" | b"Getset" | b"GetSet" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    let value = get_bytes_vec(v.get(2)).ok_or(())?;
-                    Ok(Command::GetSet(key, value))
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(GetSet(key, value))
                 }
                 b"DEL" | b"del" | b"Del" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    Ok(Command::Del(key))
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Del(key))
                 }
                 b"INCR" | b"incr" | b"Incr" => {
-                    let key = get_bytes_vec(v.get(1)).ok_or(())?;
-                    Ok(Command::Incr(key))
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Incr(key))
+                }
+                b"EXISTS" | b"exists" | b"Exists" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Exists(key))
                 }
                 b"TYPE" | b"type" | b"Type" => {
                     let key = get_bytes_vec(v.get(1)).ok_or(())?;
                     Ok(Command::Type(key))
                 }
-                b"INFO" | b"info" | b"Info" => Ok(Command::Info),
-                b"PING" | b"ping" | b"Ping" => Ok(Command::Ping),
-                b"QUIT" | b"quit" | b"Quit" => Ok(Command::Quit),
+                b"INFO" | b"info" | b"Info" => Ok(Info),
+                b"PING" | b"ping" | b"Ping" => Ok(Ping),
+                b"QUIT" | b"quit" | b"Quit" => Ok(Quit),
                 unsupported_command => Err(NotSupported(
                     std::str::from_utf8(unsupported_command)
                         .unwrap()
