@@ -403,10 +403,8 @@ fn start_server<T: Storage + Send + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use std::{thread::sleep, time::Duration};
-
-    use rayon::vec;
     use redis::{cmd, Commands, RedisResult};
+    use std::{thread::sleep, time::Duration};
     use storage::in_memory::InMemoryStorage;
 
     use crate::server::ServerState;
@@ -417,9 +415,7 @@ mod tests {
     fn test_redis_implementation() {
         let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
-
-        assert_eq!(server.start(), Some(ServerState::Started)); // this fails
-
+        assert_eq!(server.start(), Some(ServerState::Started));
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
@@ -472,23 +468,35 @@ mod tests {
     fn expire() {
         let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
-        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
-
+        assert_eq!(server.start(), Some(ServerState::Started));
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        let duration: usize = 2387;
-        let _: () = con.set("key2", "value2").unwrap();
-        let x: String = con.get("key2").unwrap();
-        assert_eq!(x, "value2");
+        // EXPIRE
+        let duration: usize = 2;
+        let _: () = con.set("key", "value").unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
 
-        let ret_val: u32 = con.pexpire("key2", duration).unwrap();
+        let ret_val: u32 = con.pexpire("key", duration).unwrap();
         assert_eq!(ret_val, 1);
-
         sleep(Duration::from_millis(duration as u64));
-        let x: Option<String> = con.get("key2").ok();
+        let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
 
+        // PEXPIRE
+        let duration: usize = 2387;
+        let _: () = con.set("key", "value").unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
+
+        let ret_val: u32 = con.pexpire("key", duration).unwrap();
+        assert_eq!(ret_val, 1);
+        sleep(Duration::from_millis(duration as u64));
+        let x: Option<String> = con.get("key").ok();
+        assert_eq!(x, None);
+
+        // SETEX
         let duration: usize = 2;
         let _: () = con.set_ex("key", "value", duration).unwrap();
         let x: String = con.get("key").unwrap();
@@ -498,12 +506,13 @@ mod tests {
         let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
 
+        // PSETEX
         let duration = 1984_usize;
-        let _: () = con.pset_ex("key3", "value3", duration).unwrap();
-        let x: String = con.get("key3").unwrap();
-        assert_eq!(x, "value3");
+        let _: () = con.pset_ex("key", "value", duration).unwrap();
+        let x: String = con.get("key").unwrap();
+        assert_eq!(x, "value");
         sleep(Duration::from_millis(duration as u64));
-        let x: Option<String> = con.get("key3").ok();
+        let x: Option<String> = con.get("key").ok();
         assert_eq!(x, None);
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
@@ -514,7 +523,7 @@ mod tests {
     fn get_set() {
         let port = 3340;
         let server = Server::new(InMemoryStorage::new(), port);
-        assert_eq!(server.start(), Some(ServerState::Started)); // this doesnt fail ??
+        assert_eq!(server.start(), Some(ServerState::Started));
 
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
@@ -548,16 +557,14 @@ mod tests {
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
+        let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
         let _ = con.set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
 
-        let x: String = con.get("key1").unwrap();
-        assert_eq!(x, "val1");
-        let x: String = con.get("key2").unwrap();
-        assert_eq!(x, "val2");
-        let x: String = con.get("key3").unwrap();
-        assert_eq!(x, "val3");
+        let exes: Vec<String> = con.get(&["key0", "key1", "key2"][..]).unwrap();
+        assert_eq!(exes[0], "val0");
+        assert_eq!(exes[1], "val1");
+        assert_eq!(exes[2], "val2");
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
@@ -571,30 +578,27 @@ mod tests {
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
         let mut con = redis_client.get_connection().unwrap();
 
-        let key_value_pairs = &[("key1", "val1"), ("key2", "val2"), ("key3", "val3")][..];
+        let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
         let x = con
             .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
             .unwrap();
-        assert_eq!(x, 1);
+        assert_eq!(x, 1); // keys were set
 
-        let x: String = con.get("key1").unwrap();
-        assert_eq!(x, "val1");
-        let x: String = con.get("key2").unwrap();
-        assert_eq!(x, "val2");
-        let x: String = con.get("key3").unwrap();
-        assert_eq!(x, "val3");
+        let exes: Vec<String> = con.get(&["key0", "key1", "key2"][..]).unwrap();
+        assert_eq!(exes[0], "val0");
+        assert_eq!(exes[1], "val1");
+        assert_eq!(exes[2], "val2");
 
+        let key_value_pairs = &[("key4", "val4"), ("key1", "val5")][..];
         let x = con
-            .mset_nx::<&'static str, &'static str, u32>(
-                &[("key4", "value4"), ("key1", "value5")][..],
-            )
+            .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
             .unwrap();
-        assert_eq!(x, 0); // A key was repeated
+        assert_eq!(x, 0); // a key was repeated so none were set
         let x: String = con.get("key1").unwrap();
-        assert_eq!(x, "val1"); // key1 should still be val1
+        assert_eq!(x, "val1"); // key1 is still val1
         let x: Option<String> = con.get("key4").ok();
-        assert_eq!(x, None); // key4 should not have been set
+        assert_eq!(x, None); // key4 was not set
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
@@ -618,14 +622,15 @@ mod tests {
         assert_eq!(exes[1], "val1");
         assert_eq!(exes[2], "val2");
 
-        let _: u32 = con.del("key0").unwrap();
-        let _: u32 = con.del("key1").unwrap();
+        let _: () = con.del("key0").unwrap();
+        let _: () = con.del("key1").unwrap();
 
         let keys = vec!["key0", "key1", "key2"];
-        let new_exes: Vec<Option<String>> = con.get(keys).unwrap();
-        assert_eq!(new_exes[0], None);
-        assert_eq!(new_exes[1], None);
-        assert_eq!(new_exes[2], Some("val2".to_string()));
+        let exes: Vec<Option<String>> = con.get(keys).unwrap();
+        assert_eq!(exes[0], None);
+        assert_eq!(exes[1], None);
+        assert_eq!(exes[2], Some("val2".to_string()));
+
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 

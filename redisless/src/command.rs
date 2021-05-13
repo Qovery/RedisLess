@@ -79,8 +79,9 @@ impl Command {
                     if pairs.is_empty() || pairs.len() % chunk_size != 0 {
                         return Err(ArgNumber);
                     }
+
                     let mut items = Vec::<(Key, Value)>::with_capacity(pairs.len());
-                    for pair in pairs.chunks(chunk_size) {
+                    for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
                                 let key = get_bytes_vec(Some(&key))?;
@@ -101,7 +102,7 @@ impl Command {
                     }
 
                     let mut items = Items::with_capacity(pairs.len());
-                    for pair in pairs.chunks(chunk_size) {
+                    for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
                                 let key = get_bytes_vec(Some(&key))?;
@@ -145,7 +146,7 @@ impl Command {
                     Ok(GetSet(key, value))
                 }
                 b"MGET" | b"mget" | b"MGet" => {
-                    let keys = &v[1..];
+                    let keys = &v[1..]; // will never panic
                     if keys.is_empty() {
                         return Err(ArgNumber);
                     }
