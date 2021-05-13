@@ -586,7 +586,7 @@ mod tests {
     #[serial]
     fn mset() {
         // make these first 5 lines into a macro?
-        let port = 3342;
+        let port = 3343;
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started));
         let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
