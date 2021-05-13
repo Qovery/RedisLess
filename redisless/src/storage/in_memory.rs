@@ -160,14 +160,14 @@ mod tests {
             assert_eq!(mem.read(b"key"), None);
         }
     }
-    
+
     #[test]
     fn contains() {
         let mut mem = InMemoryStorage::new();
         mem.write(b"key1", b"value1");
         let x = mem.contains(b"key1");
-        assert_eq!(x, 1);
+        assert_eq!(x, true);
         let x = mem.contains(b"key2");
-        assert_eq!(x, 0);
+        assert_eq!(x, false);
     }
 }
