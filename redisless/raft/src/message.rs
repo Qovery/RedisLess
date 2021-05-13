@@ -1,7 +1,7 @@
 //! Raft message types for sending between nodes.
 //!
 //! This module provides data types for messages to be sent between Raft nodes. The top-level message type is
-//! [`RaftMessage`]. Protobuf-based serialization of all types in this module is provided through the `prost` crate if
+//! [`Message`]. Protobuf-based serialization of all types in this module is provided through the `prost` crate if
 //! the corresponding feature is enabled.
 
 use core::cmp::Ordering;
@@ -12,7 +12,7 @@ use bytes::Bytes;
 
 use crate::prelude::*;
 
-/// A [`RaftMessage`] to be sent to a destination.
+/// A [`Message`] to be sent to a destination.
 pub struct SendableMessage<NodeId> {
     /// The message to be sent.
     pub message: Message,
@@ -166,7 +166,7 @@ pub struct LogIndex {
 }
 
 //
-// RaftMessage impls
+// Message impls
 //
 
 impl fmt::Display for Message {

@@ -1,17 +1,19 @@
 //! A complex networked example as a command-line tool.
 
-use bytes::{BufMut, Bytes};
-use prost::Message as PMessage;
-use raft::log::memory::InMemoryLog;
-use raft::message::{Message, MessageDestination, SendableMessage};
-use raft::node::{AppendError, Config, Node};
-use rand_core::OsRng;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+use bytes::{BufMut, Bytes};
+use prost::Message as PMessage;
+use rand_core::OsRng;
+
+use raft::log::memory::InMemoryLog;
+use raft::message::{Message, MessageDestination, SendableMessage};
+use raft::node::{AppendError, Config, Node};
 
 const TICK_DURATION: Duration = Duration::from_millis(50);
 const RAFT_LOG_CAPACITY: usize = 100 * 1024 * 1024;
@@ -60,9 +62,11 @@ fn main() {
     } = parse_args();
 
     let (main_tx, main_rx) = mpsc::channel::<IncomingMessage>();
+
     if let Some(bind_addr) = bind_addr {
         start_peer_listener(main_tx.clone(), bind_addr);
     }
+
     let network = start_peer_senders(node_id.clone(), peers.clone());
 
     // Send lines from stdin to the main thread

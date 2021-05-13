@@ -6,6 +6,7 @@ use storage::in_memory::InMemoryStorage;
 
 use crate::server::{Server, ServerState};
 
+mod cluster;
 mod command;
 mod error;
 mod protocol;

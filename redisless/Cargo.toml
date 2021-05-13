@@ -19,6 +19,7 @@ crossbeam-channel = "0.5"
 rayon = "1.5"
 uuid = { version = "0.8", features=["v4"] }
 rand = "0.8"
+prost = "0.7"
 
 [dev-dependencies]
 redis = "0.20"

@@ -7,6 +7,7 @@ use std::time::{Duration, SystemTime};
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
 
+use crate::cluster::peer::PeersDiscovery;
 use crate::protocol;
 use crate::protocol::{RedisProtocolParser, Resp};
 use crate::storage::Storage;
@@ -18,6 +19,7 @@ type CommandResponse = Vec<u8>;
 
 pub struct Server {
     server_state_bus: MPB<ServerState>,
+    cluster_options: ServerClusterOptions,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -30,10 +32,43 @@ pub enum ServerState {
     Error(String),
 }
 
+#[derive(Debug)]
+pub struct ServerClusterOptions {
+    group_id: String,
+    peers_discovery: PeersDiscovery,
+}
+
+impl ServerClusterOptions {
+    pub fn new(group_id: String, peers_discovery: PeersDiscovery) -> Self {
+        ServerClusterOptions {
+            group_id,
+            peers_discovery,
+        }
+    }
+}
+
+impl Default for ServerClusterOptions {
+    fn default() -> Self {
+        ServerClusterOptions {
+            group_id: String::from("primary"),
+            peers_discovery: PeersDiscovery::Automatic,
+        }
+    }
+}
+
 impl Server {
     pub fn new<T: Storage + Send + 'static>(storage: T, port: u16) -> Self {
+        Server::new_with_options(storage, ServerClusterOptions::default(), port)
+    }
+
+    pub fn new_with_options<T: Storage + Send + 'static>(
+        storage: T,
+        cluster_options: ServerClusterOptions,
+        port: u16,
+    ) -> Self {
         let s = Server {
             server_state_bus: MPB::new(),
+            cluster_options,
         };
 
         s._init_configuration(format!("0.0.0.0:{}", port), storage);
@@ -506,6 +541,7 @@ mod tests {
 
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
+
     #[test]
     #[serial]
     fn mset_nx() {
