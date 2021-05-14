@@ -8,7 +8,7 @@ use crate::Server;
 #[test]
 #[serial]
 fn test_redis_implementation() {
-    let port = 3340;
+    let port = 3366;
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
@@ -61,7 +61,7 @@ fn test_redis_implementation() {
 #[test]
 #[serial]
 fn expire() {
-    let port = 3340;
+    let port = 3359;
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
@@ -201,7 +201,7 @@ fn mset_nx() {
 #[test]
 #[serial]
 fn mget() {
-    let port = 3342;
+    let port = 3346;
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();

@@ -1,20 +1,22 @@
-#[cfg(test)]
-mod tests;
-
-mod util;
-use util::*;
-
 use std::io::ErrorKind;
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
+use rayon::ThreadPool;
+
+use util::*;
 
 use crate::cluster::peer::PeersDiscovery;
 use crate::storage::Storage;
+
+#[cfg(test)]
+mod tests;
+
+mod util;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
@@ -175,42 +177,7 @@ fn start_server<T: Storage + Send + 'static>(
     for stream in listener.incoming() {
         match stream {
             Ok(tcp_stream) => {
-                let storage = storage.clone();
-                let state_recv = state_recv.clone();
-                let state_send = state_send.clone();
-
-                let _ = thread_pool.spawn(move || {
-                    let mut last_update = SystemTime::now();
-
-                    loop {
-                        let (close_connection, received_data_length) =
-                            handle_request(&storage, &tcp_stream);
-
-                        if received_data_length > 0 {
-                            // reset the last time we received data
-                            last_update = SystemTime::now();
-                        } else {
-                            // delay the loop
-                            thread::sleep(Duration::from_millis(10));
-                        }
-
-                        if stop_sig_received(&state_recv, &state_send) || close_connection {
-                            // let's close the connection
-                            return;
-                        }
-
-                        if let Ok(duration) = last_update.duration_since(SystemTime::now()) {
-                            if duration.as_secs() >= 300 {
-                                // close the connection after 300 secs of inactivity
-                                return;
-                            }
-                        }
-
-                        if close_connection {
-                            return;
-                        }
-                    }
-                });
+                handle_tcp_stream(tcp_stream, &thread_pool, &state_send, &state_recv, &storage);
             }
             Err(err) if err.kind() == ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(10));
@@ -225,4 +192,48 @@ fn start_server<T: Storage + Send + 'static>(
             break;
         }
     }
+}
+
+fn handle_tcp_stream<T: Storage + Send + 'static>(
+    tcp_stream: TcpStream,
+    thread_pool: &ThreadPool,
+    state_send: &Sender<ServerState>,
+    state_recv: &Receiver<ServerState>,
+    storage: &Arc<Mutex<T>>,
+) {
+    let storage = storage.clone();
+    let state_recv = state_recv.clone();
+    let state_send = state_send.clone();
+
+    let _ = thread_pool.spawn(move || {
+        let mut last_update = SystemTime::now();
+
+        loop {
+            let (close_connection, received_data_length) = handle_request(&storage, &tcp_stream);
+
+            if received_data_length > 0 {
+                // reset the last time we received data
+                last_update = SystemTime::now();
+            } else {
+                // delay the loop
+                thread::sleep(Duration::from_millis(10));
+            }
+
+            if stop_sig_received(&state_recv, &state_send) || close_connection {
+                // let's close the connection
+                return;
+            }
+
+            if let Ok(duration) = last_update.duration_since(SystemTime::now()) {
+                if duration.as_secs() >= 300 {
+                    // close the connection after 300 secs of inactivity
+                    return;
+                }
+            }
+
+            if close_connection {
+                return;
+            }
+        }
+    });
 }
