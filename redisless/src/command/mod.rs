@@ -1,6 +1,12 @@
-use crate::protocol::error::RedisCommandError;
+#[cfg(test)]
+mod tests;
+
+pub mod command_error;
+mod util;
+
 use crate::protocol::Resp;
-use crate::storage::in_memory::Expiry;
+use crate::storage::models::Expiry;
+use command_error::RedisCommandError;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -28,20 +34,9 @@ pub enum Command {
     Quit,
 }
 
-fn get_bytes_vec(resp: Option<&Resp>) -> Result<Vec<u8>, RedisCommandError> {
-    match resp {
-        Some(Resp::String(x)) | Some(Resp::BulkString(x)) => Ok(x.to_vec()),
-        _ => Err(RedisCommandError::ArgNumber),
-    }
-}
-
-fn parse_duration(bytes: Vec<u8>) -> Result<u64, RedisCommandError> {
-    let duration = std::str::from_utf8(&bytes[..])?;
-    Ok(duration.parse::<u64>()?)
-}
-
 impl Command {
     pub fn parse(v: Vec<Resp>) -> Result<Self, RedisCommandError> {
+        use util::*;
         use Command::*;
         use RedisCommandError::*;
 
@@ -181,27 +176,6 @@ impl Command {
                 )),
             },
             _ => Err(InvalidCommand),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::command::Command;
-    use crate::protocol::Resp;
-
-    #[test]
-    fn set_command() {
-        let commands = vec![b"SET", b"set"];
-        for cmd in commands {
-            let resp = vec![
-                Resp::BulkString(cmd),
-                Resp::BulkString(b"mykey"),
-                Resp::BulkString(b"value"),
-            ];
-
-            let command = Command::parse(resp).unwrap();
-            assert_eq!(command, Command::Set(b"mykey".to_vec(), b"value".to_vec()));
         }
     }
 }

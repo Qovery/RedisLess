@@ -1,63 +1,65 @@
-use std::{
-    fmt::{Display, Formatter},
-    num::ParseIntError,
-    str::Utf8Error,
-};
-
-use crate::storage::in_memory::TimeOverflow;
-
-use super::RedisError;
-
 #[derive(Debug)]
-pub enum RedisCommandError {
-    // Wrong number of arguments, holds command
-    ArgNumber,
-    // Overflow when setting the expiry timestamp
-    TimeOverflow(TimeOverflow),
-    // Could not convert bytes to UTF8
-    BadString(Utf8Error),
-    // Could not parse string for a u64
-    IntParse(ParseIntError),
-    // Command is not supported by Redisless
-    NotSupported(String),
-    ProtocolParse(RedisError),
-    InvalidCommand,
-    CommandNotFound,
+pub struct RedisError {
+    pub err_type: RedisErrorType,
+}
+#[derive(Debug)]
+pub enum RedisErrorType {
+    // Unknown symbol at index
+    UnknownSymbol,
+    // Attempting to parse an empty input
+    EmptyInput,
+    // Cannot find CRLF at index
+    NoCrlf,
+    // Incorrect format detected
+    IncorrectFormat,
+    Other(Box<dyn std::error::Error>),
 }
 
-impl Display for RedisCommandError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ArgNumber => {
-                write!(f, "wrong number of arguments for command")
-            }
-            Self::TimeOverflow(e) => write!(f, "{:?}", e),
-            Self::BadString(e) => write!(f, "{}", e),
-            Self::IntParse(e) => write!(f, "{}", e),
-            Self::NotSupported(cmd) => {
-                write!(f, "command {} not supported by redisless", cmd)
-            }
-            Self::ProtocolParse(err) => write!(f, "{}", err),
-            Self::InvalidCommand => write!(f, "invalid command"),
-            Self::CommandNotFound => write!(f, "command not found"),
+impl RedisError {
+    pub fn unknown_symbol() -> Self {
+        Self {
+            err_type: RedisErrorType::UnknownSymbol,
+        }
+    }
+
+    pub fn empty_input() -> Self {
+        Self {
+            err_type: RedisErrorType::EmptyInput,
+        }
+    }
+
+    pub fn no_crlf() -> Self {
+        Self {
+            err_type: RedisErrorType::NoCrlf,
+        }
+    }
+    pub fn incorrect_format() -> Self {
+        Self {
+            err_type: RedisErrorType::IncorrectFormat,
         }
     }
 }
 
-impl From<TimeOverflow> for RedisCommandError {
-    fn from(err: TimeOverflow) -> Self {
-        Self::TimeOverflow(err)
+impl<'a> std::fmt::Display for RedisError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
-impl From<Utf8Error> for RedisCommandError {
-    fn from(err: Utf8Error) -> Self {
-        Self::BadString(err)
+impl<'a> std::error::Error for RedisError {}
+
+impl<'a> From<std::str::Utf8Error> for RedisError {
+    fn from(from: std::str::Utf8Error) -> Self {
+        Self {
+            err_type: RedisErrorType::Other(Box::new(from)),
+        }
     }
 }
 
-impl From<ParseIntError> for RedisCommandError {
-    fn from(err: ParseIntError) -> Self {
-        Self::IntParse(err)
+impl<'a> From<std::num::ParseIntError> for RedisError {
+    fn from(from: std::num::ParseIntError) -> Self {
+        Self {
+            err_type: RedisErrorType::Other(Box::new(from)),
+        }
     }
 }

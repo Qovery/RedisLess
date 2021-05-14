@@ -1,6 +1,10 @@
-use in_memory::Expiry;
+#[cfg(test)]
+mod tests;
 
 pub mod in_memory;
+pub mod models;
+
+use models::expiry::Expiry;
 
 pub trait Storage {
     fn write(&mut self, key: &[u8], value: &[u8]);

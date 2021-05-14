@@ -1,63 +1,11 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
 
+use super::models::{DataType, Expiry, RedisValue};
 use crate::storage::Storage;
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Expiry {
-    timestamp: Instant,
-}
-
-#[derive(Debug)]
-pub struct TimeOverflow {}
-
-impl Expiry {
-    pub fn new_from_millis(duration: u64) -> Result<Self, TimeOverflow> {
-        Instant::now()
-            .checked_add(Duration::from_millis(duration))
-            .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow {})
-    }
-
-    pub fn new_from_secs(duration: u64) -> Result<Self, TimeOverflow> {
-        Instant::now()
-            .checked_add(Duration::from_secs(duration))
-            .map(|t| Self { timestamp: t })
-            .ok_or(TimeOverflow {})
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RedisValue {
-    pub data: Vec<u8>,
-    pub expiry: Option<Expiry>,
-}
-
-impl RedisValue {
-    pub fn new(data: Vec<u8>, expiry: Option<Expiry>) -> Self {
-        RedisValue { data, expiry }
-    }
-
-    pub fn is_expired(&self) -> bool {
-        match &self.expiry {
-            Some(expiry) if expiry.timestamp <= Instant::now() => true,
-            _ => false,
-        }
-    }
-}
 
 pub struct InMemoryStorage {
     data_mapper: HashMap<Vec<u8>, DataType>,
     string_store: HashMap<Vec<u8>, RedisValue>,
-}
-
-enum DataType {
-    String,
-    List,
-    Set,
-    Hash,
 }
 
 impl InMemoryStorage {
@@ -116,58 +64,5 @@ impl Storage for InMemoryStorage {
 
     fn contains(&mut self, key: &[u8]) -> bool {
         self.data_mapper.contains_key(key)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{thread::sleep, time::Duration};
-
-    use crate::storage::in_memory::{Expiry, InMemoryStorage};
-    use crate::storage::Storage;
-
-    #[test]
-    fn test_in_memory_storage() {
-        let mut mem = InMemoryStorage::new();
-        mem.write(b"key", b"xxx");
-        assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
-        assert_eq!(mem.remove(b"key"), 1);
-        assert_eq!(mem.remove(b"key"), 0);
-        assert_eq!(mem.read(b"does not exist"), None);
-    }
-
-    #[test]
-    fn test_expire() {
-        let mut mem = InMemoryStorage::new();
-
-        let duration: u64 = 4;
-        mem.write(b"key", b"xxx");
-        if let Ok(e) = Expiry::new_from_secs(duration) {
-            let ret_val = mem.expire(b"key", e);
-            assert_eq!(ret_val, 1);
-            assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
-            sleep(Duration::from_secs(duration));
-            assert_eq!(mem.read(b"key"), None);
-        }
-
-        let duration: u64 = 1738;
-        mem.write(b"key", b"xxx");
-        if let Ok(e) = Expiry::new_from_millis(duration) {
-            let ret_val = mem.expire(b"key", e);
-            assert_eq!(ret_val, 1);
-            assert_eq!(mem.read(b"key"), Some(&b"xxx"[..]));
-            sleep(Duration::from_millis(duration));
-            assert_eq!(mem.read(b"key"), None);
-        }
-    }
-
-    #[test]
-    fn contains() {
-        let mut mem = InMemoryStorage::new();
-        mem.write(b"key1", b"value1");
-        let x = mem.contains(b"key1");
-        assert_eq!(x, true);
-        let x = mem.contains(b"key2");
-        assert_eq!(x, false);
     }
 }
