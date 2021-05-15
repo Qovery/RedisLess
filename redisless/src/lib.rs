@@ -2,11 +2,12 @@
 #[macro_use]
 extern crate serial_test;
 
-#[cfg(test)]
-mod tests;
+use storage::in_memory::InMemoryStorage;
 
 use crate::server::{Server, ServerState};
-use storage::in_memory::InMemoryStorage;
+
+#[cfg(test)]
+mod tests;
 
 mod cluster;
 mod command;

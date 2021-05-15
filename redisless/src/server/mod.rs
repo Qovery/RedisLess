@@ -1,5 +1,5 @@
 use std::io::ErrorKind;
-use std::net::{TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -7,10 +7,11 @@ use std::time::{Duration, SystemTime};
 use crossbeam_channel::{Receiver, Sender};
 use mpb::MPB;
 use rayon::ThreadPool;
+use uuid::Uuid;
 
 use util::*;
 
-use crate::cluster::peer::PeersDiscovery;
+use crate::cluster::peer::{Peer, PeersDiscovery, DEFAULT_NODE_LISTENING_PORT};
 use crate::storage::Storage;
 
 #[cfg(test)]
@@ -41,13 +42,19 @@ pub enum ServerState {
 pub struct ServerClusterOptions {
     group_id: String,
     peers_discovery: PeersDiscovery,
+    listening_socket_addr: SocketAddr,
 }
 
 impl ServerClusterOptions {
-    pub fn new(group_id: String, peers_discovery: PeersDiscovery) -> Self {
+    pub fn new(
+        group_id: String,
+        peers_discovery: PeersDiscovery,
+        listening_socket_addr: SocketAddr,
+    ) -> Self {
         ServerClusterOptions {
             group_id,
             peers_discovery,
+            listening_socket_addr,
         }
     }
 }
@@ -57,16 +64,20 @@ impl Default for ServerClusterOptions {
         ServerClusterOptions {
             group_id: String::from("primary"),
             peers_discovery: PeersDiscovery::Automatic,
+            listening_socket_addr: SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                DEFAULT_NODE_LISTENING_PORT,
+            ),
         }
     }
 }
 
 impl Server {
     pub fn new<T: Storage + Send + 'static>(storage: T, port: u16) -> Self {
-        Server::new_with_options(storage, ServerClusterOptions::default(), port)
+        Server::new_with_cluster_options(storage, ServerClusterOptions::default(), port)
     }
 
-    pub fn new_with_options<T: Storage + Send + 'static>(
+    pub fn new_with_cluster_options<T: Storage + Send + 'static>(
         storage: T,
         cluster_options: ServerClusterOptions,
         port: u16,
@@ -89,6 +100,14 @@ impl Server {
         let state_send = self.server_state_bus.sender();
         let state_recv = self.server_state_bus.receiver();
 
+        let id = Uuid::new_v4();
+        let peer = Peer::new(
+            id.to_string(),
+            PeersDiscovery::Automatic,
+            self.cluster_options.listening_socket_addr,
+        );
+        let cluster_node = peer.into_cluster_node();
+
         let _ = thread::spawn(move || {
             let addr = addr;
             let storage = Arc::new(Mutex::new(storage));
@@ -96,7 +115,11 @@ impl Server {
             loop {
                 if let Ok(server_state) = state_recv.recv() {
                     if server_state == ServerState::Start {
+                        // start local RESP server
                         start_server(&addr, &state_send, &state_recv, &storage);
+
+                        // start current node listener
+                        cluster_node.start_listener();
                     }
                 }
             }
