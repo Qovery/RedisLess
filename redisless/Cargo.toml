@@ -21,6 +21,7 @@ uuid = { version = "0.8", features=["v4"] }
 rand = "0.8"
 prost = "0.7"
 get_if_addrs = "0.5"
+ipnet = "2.3"
 
 [dev-dependencies]
 redis = "0.20"
