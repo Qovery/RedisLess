@@ -3,7 +3,7 @@ use raft::log::memory::InMemoryLog;
 use raft::node::{Config, Node};
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 
 pub const DEFAULT_NODE_LISTENING_PORT: u16 = 8686;
 
@@ -19,19 +19,19 @@ pub type Peers = Vec<Peer>;
 pub struct Peer {
     id: String,
     peers_discovery: PeersDiscovery,
-    socket_addr: SocketAddr,
+    listening_socket_addr: SocketAddr,
 }
 
 impl Peer {
     pub fn new<T: Into<String>>(
         id: T,
         peers_discovery: PeersDiscovery,
-        socket_addr: SocketAddr,
+        listening_socket_addr: SocketAddr,
     ) -> Self {
         Peer {
             id: id.into(),
             peers_discovery,
-            socket_addr,
+            listening_socket_addr,
         }
     }
 
@@ -50,7 +50,7 @@ impl Peer {
                 CONFIG,
             ),
             peers,
-            self.socket_addr,
+            self.listening_socket_addr,
         )
     }
 }

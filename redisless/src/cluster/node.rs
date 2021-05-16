@@ -12,16 +12,16 @@ type RaftNode = Node<InMemoryLog, OsRng, String>;
 pub struct ClusterNode {
     node: RaftNode,
     peers: Peers,
-    socket_addr: SocketAddr,
+    listening_socket_addr: SocketAddr,
     listener_started: bool,
 }
 
 impl ClusterNode {
-    pub fn new(node: RaftNode, peers: Peers, socket_addr: SocketAddr) -> Self {
+    pub fn new(node: RaftNode, peers: Peers, listening_socket_addr: SocketAddr) -> Self {
         ClusterNode {
             node,
             peers,
-            socket_addr,
+            listening_socket_addr,
             listener_started: false,
         }
     }
@@ -29,6 +29,15 @@ impl ClusterNode {
     // start TCP socket listener to handle incoming message from peers
     pub fn start_listener(&self) {
         if self.listener_started {
+            return;
+        }
+
+        // TODO
+    }
+
+    // stop TCP socket listener to handle incoming message from peers
+    pub fn stop_listener(&self) {
+        if !self.listener_started {
             return;
         }
 
