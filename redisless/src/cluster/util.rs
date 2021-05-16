@@ -1,9 +1,12 @@
+use std::io::{BufReader, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::unbounded;
-use ipnet::{Ipv4AddrRange, Ipv4Net};
+use ipnet::Ipv4AddrRange;
+
+use crate::cluster::node::{GETINFO_REQUEST, GETINFO_RESPONSE};
 
 pub fn get_local_network_ip_addresses(ip_addresses: Vec<IpAddr>) -> Vec<IpAddr> {
     ip_addresses
@@ -95,9 +98,14 @@ enum ParallelResponse<T> {
     End,
 }
 
+type PeerId = String;
+
 /// TCP scan a range of ip addresses with a list of ports
 /// return a list of ip addresses with the associated port that are open
-pub fn scan_ip_range(ip_addresses: Vec<IpAddr>, ports_to_scan: Vec<u16>) -> Vec<SocketAddr> {
+pub fn scan_ip_range(
+    ip_addresses: Vec<IpAddr>,
+    ports_to_scan: Vec<u16>,
+) -> Vec<(PeerId, SocketAddr)> {
     let mut opened_sockets = vec![];
 
     let thread_pool = match rayon::ThreadPoolBuilder::new()
@@ -110,7 +118,7 @@ pub fn scan_ip_range(ip_addresses: Vec<IpAddr>, ports_to_scan: Vec<u16>) -> Vec<
         }
     };
 
-    let (tx, rx) = unbounded::<ParallelResponse<SocketAddr>>();
+    let (tx, rx) = unbounded::<ParallelResponse<(PeerId, SocketAddr)>>();
 
     thread::spawn(move || {
         for ip_address in ip_addresses {
@@ -126,7 +134,24 @@ pub fn scan_ip_range(ip_addresses: Vec<IpAddr>, ports_to_scan: Vec<u16>) -> Vec<
 
                     let res =
                         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(10)) {
-                            Ok(_) => ParallelResponse::Ok(socket_addr), // socket opened - ip + port does exist
+                            Ok(mut tcp_stream) => {
+                                // check that the remote is valid
+                                let _ = tcp_stream.write(GETINFO_REQUEST);
+
+                                let mut response_buffer = [0; 256];
+                                let _ = tcp_stream.read(&mut response_buffer);
+
+                                match response_buffer {
+                                    res if res.starts_with(GETINFO_RESPONSE) => {
+                                        let node_id = &res[GETINFO_RESPONSE.len()..]; // "getinfo:<node_id>"
+                                        ParallelResponse::Ok((
+                                            String::from_utf8(node_id.to_vec()).unwrap(),
+                                            socket_addr,
+                                        ))
+                                    }
+                                    _ => ParallelResponse::Continue,
+                                }
+                            } // socket opened - ip + port does exist
                             Err(_) => ParallelResponse::Continue, // can't open a socket - then continue
                         };
 
@@ -138,8 +163,8 @@ pub fn scan_ip_range(ip_addresses: Vec<IpAddr>, ports_to_scan: Vec<u16>) -> Vec<
 
     for res in rx {
         match res {
-            ParallelResponse::Ok(socket_addr) => {
-                opened_sockets.push(socket_addr);
+            ParallelResponse::Ok(res) => {
+                opened_sockets.push(res);
             }
             ParallelResponse::Continue => continue,
             ParallelResponse::End => break,

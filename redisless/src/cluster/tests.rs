@@ -89,11 +89,11 @@ fn test_scan_ip_range_no_result() {
 
 #[test]
 fn test_scan_ip_range_with_4_peers() {
-    let nodes: Vec<ClusterNode> = (0..3u16)
+    let mut nodes: Vec<ClusterNode> = (0..3u16)
         .map(|i| {
             Peer::new(
                 format!("{}", i),
-                PeersDiscovery::Automatic,
+                PeersDiscovery::Automatic(DEFAULT_NODE_LISTENING_PORT),
                 SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::UNSPECIFIED,
                     DEFAULT_NODE_LISTENING_PORT + i,
@@ -118,14 +118,14 @@ fn test_scan_ip_range_with_4_peers() {
     assert_eq!(opened_sockets.len(), 0);
 
     // start nodes
-    for node in nodes.iter() {
+    for node in nodes.iter_mut() {
         node.start_listener();
     }
 
     //assert_eq!(opened_sockets.len(), 4);
 
     // stop nodes
-    for node in nodes.iter() {
+    for node in nodes.iter_mut() {
         node.stop_listener();
     }
 
