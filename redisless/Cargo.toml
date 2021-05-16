@@ -14,9 +14,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 mpb = { path = "mpb" }
-storage = { path = "storage" }
-crossbeam-channel = "0.5.1"
-rayon = "1.5.0"
+raft = { path = "raft" }
+crossbeam-channel = "0.5"
+rayon = "1.5"
+uuid = { version = "0.8", features=["v4"] }
+rand = "0.8"
+prost = "0.7"
+get_if_addrs = "0.5"
+ipnet = "2.3"
 
 [dev-dependencies]
 redis = "0.20"
