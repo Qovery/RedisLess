@@ -14,15 +14,15 @@ the [Redis](https://redis.io/topics/introduction) API.**
 
 > RedisLess is the concatenation of Redis and Serverless.
 
-# The starting point
+# Motivation
 
-[Romaric](https://twitter.com/rophilogene), initiator of RedisLess:
-
-> I am a backend engineer. And as a backend developer, I mostly work on providing web API for frontend developers and backend developers. Redis is part of my toolset - especially when I share data and sync states between my backend apps. One of the downsides of Redis (like for all databases) is that you need to spawn a Redis server and maintain it.
+> As a backend developer, I mostly work on providing web API for frontend developers and backend developers. Redis is part of my toolset - especially when I share data and sync states between my backend apps. For those simple use cases, I don't want to have to spawn a Redis server.
 
 > So, imagine a world where your Redis instance is nothing more than a lib in your app. Imagine that this lib can sync the data with other neighborhood instances?
 
 > That's the idea behind RedisLess, a lightweight, embedded, and scalable in-memory Key/Value store library compatible with the Redis API.
+
+> [Follow me on Twitter](https://twitter.com/rophilogene) 🙋‍♂️
 
 Read more about RedisLess:
 * May 13 2021: [How I imagine the future of databases in the Cloud](https://www.heapstack.sh/how-i-imagine-the-future-of-databases-in-the-cloud)
@@ -105,7 +105,6 @@ redis.delete('foo')  # return 1
 redisless.stop()
 ```
 
-
 # What is RedisLess
 
 * Embedded in-memory. (No Redis server required!).
@@ -119,9 +118,24 @@ What RedisLess is not:
 * Production ready yet.
 * 1:1 Redis implementation.
 
+# Use cases
+
+The goal of RedisLess is not to remove the need of Redis server for heavy workload. **If you consider to store more than 2 GB of data in RedisLess you are better to use Redis**. There is no hard limit, but RedisLess is designed to manage and share small dataset between apps.
+
+✅ Good use cases:
+
+- Distributed lock between your apps.
+- Share data (lower than 2 GB) between your apps.
+- Cache where reads are more important than writes.
+
+❌ Bad use cases:
+
+- Store more than 2 GB of data.
+- Cache where writes are more important than reads.
+
 # Planned features
 
-- [ ] Redis API ([see implemented features](REDIS_FEATURES.md))
+- [ ] Redis API ([see implemented features](https://github.com/Qovery/RedisLess/issues/38))
 - [ ] Cluster mode
 - [ ] Auto-discovery
 - [ ] Disk persistence
@@ -136,7 +150,7 @@ What RedisLess is not:
 # Expected performance
 
 Strong attention to performance and code cleanliness is given when designing RedisLess. It aims to be crash-free, super-fast and put a
-minimum strain on your server resources (benchmarks will come soon).
+minimum strain on your server resources. 
 
 RedisLess is written in Rust and export functions through FFI (Foreign Function Interface), making it usable from any language. We provide
 clients for NodeJS, Python, Golang, Java, and Rust. Supporting a new language can be done in 5 minutes. Look at [Python](clients/python)
