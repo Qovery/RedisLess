@@ -68,7 +68,29 @@ impl Storage for InMemoryStorage {
         }
     }
 
+    /// If the key was present **and** the key was not expired, return `true`
+    ///
+    /// If the key present but was expired, remove the key and return `false`
+    ///
+    /// If the key was not present at all, return `false`
     fn contains(&mut self, key: &[u8]) -> bool {
-        self.data_mapper.contains_key(key)
+        if let Some(meta) = self.data_mapper.get(key) {
+            match meta.is_expired() {
+                true => {
+                    self.remove(key);
+                    false
+                }
+                false => true,
+            }
+        } else {
+            false
+        }
+    }
+
+    fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>) {
+        let meta = RedisMeta::new(RedisType::Hash, None);
+        self.data_mapper.insert(key.to_vec(), meta);
+        self.hash_store
+            .insert(key.to_vec(), RedisHashMap::new(value));
     }
 }
