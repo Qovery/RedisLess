@@ -23,8 +23,7 @@ impl Storage for InMemoryStorage {
     fn write(&mut self, key: &[u8], value: &[u8]) {
         let meta = RedisMeta::new(RedisType::String, None);
         self.data_mapper.insert(key.to_vec(), meta);
-        self.string_store
-            .insert(key.to_vec(), value.to_vec());
+        self.string_store.insert(key.to_vec(), value.to_vec());
     }
 
     fn expire(&mut self, key: &[u8], expiry: Expiry) -> u32 {
