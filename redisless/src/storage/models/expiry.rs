@@ -23,7 +23,3 @@ impl Expiry {
             .ok_or(TimeOverflow {})
     }
 }
-
-pub trait Expire {
-    fn is_expired(&mut self) -> bool; 
-}
