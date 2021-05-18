@@ -63,7 +63,7 @@ impl Default for ServerClusterOptions {
     fn default() -> Self {
         ServerClusterOptions {
             group_id: String::from("primary"),
-            peers_discovery: PeersDiscovery::Automatic,
+            peers_discovery: PeersDiscovery::Automatic(DEFAULT_NODE_LISTENING_PORT),
             listening_socket_addr: SocketAddr::new(
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED),
                 DEFAULT_NODE_LISTENING_PORT,
@@ -103,10 +103,11 @@ impl Server {
         let id = Uuid::new_v4();
         let peer = Peer::new(
             id.to_string(),
-            PeersDiscovery::Automatic,
+            PeersDiscovery::Automatic(self.cluster_options.listening_socket_addr.port()),
             self.cluster_options.listening_socket_addr,
         );
-        let cluster_node = peer.into_cluster_node();
+
+        let mut cluster_node = peer.into_cluster_node();
 
         let _ = thread::spawn(move || {
             let addr = addr;
@@ -187,7 +188,6 @@ fn start_server<T: Storage + Send + 'static>(
 
     let thread_pool = match rayon::ThreadPoolBuilder::new()
         .thread_name(|_| "request handler".to_string())
-        .num_threads(4)
         .build()
     {
         Ok(pool) => pool,
