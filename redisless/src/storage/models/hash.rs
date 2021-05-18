@@ -1,13 +1,13 @@
-use super::RedisValue;
+use super::RedisString;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub struct RedisHashMap {
-    pub data: HashMap<RedisValue, RedisValue>,
+    pub data: HashMap<RedisString, RedisString>,
 }
 
 impl RedisHashMap {
-    pub fn new(data: HashMap<RedisValue, RedisValue>) -> Self {
+    pub fn new(data: HashMap<RedisString, RedisString>) -> Self {
         Self { data }
     }
 }

@@ -4,9 +4,9 @@ use super::models::*;
 use crate::storage::Storage;
 
 pub struct InMemoryStorage {
-    data_mapper: HashMap<RedisValue, RedisMeta>,
-    string_store: HashMap<RedisValue, RedisString>,
-    hash_store: HashMap<RedisValue, RedisHashMap>,
+    data_mapper: HashMap<RedisString, RedisMeta>,
+    string_store: HashMap<RedisString, RedisString>,
+    hash_store: HashMap<RedisString, RedisHashMap>,
 }
 
 impl InMemoryStorage {
@@ -24,7 +24,7 @@ impl Storage for InMemoryStorage {
         let meta = RedisMeta::new(RedisType::String, None);
         self.data_mapper.insert(key.to_vec(), meta);
         self.string_store
-            .insert(key.to_vec(), RedisString::new(value.to_vec()));
+            .insert(key.to_vec(), value.to_vec());
     }
 
     fn expire(&mut self, key: &[u8], expiry: Expiry) -> u32 {
@@ -43,7 +43,7 @@ impl Storage for InMemoryStorage {
                     self.remove(key);
                     None
                 }
-                false => Some(&self.string_store.get(key).unwrap().data[..]),
+                false => Some(&self.string_store.get(key).unwrap()[..]),
             }
         } else {
             None
