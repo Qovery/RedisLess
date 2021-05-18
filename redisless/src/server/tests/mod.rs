@@ -1,4 +1,4 @@
-use redis::{Commands, RedisError, RedisResult, cmd};
+use redis::{cmd, Commands, RedisError, RedisResult};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
@@ -256,7 +256,9 @@ fn hset() {
     let mut con = redis_client.get_connection().unwrap();
 
     let key_value_pairs = &[("fkey0", "val0"), ("fkey1", "val1"), ("fkey2", "val2")][..];
-    let _: () =  con.hset_multiple::<&'static str, &'static str, &'static str, ()>("key0", key_value_pairs).unwrap();
+    let _: () = con
+        .hset_multiple::<&'static str, &'static str, &'static str, ()>("key0", key_value_pairs)
+        .unwrap();
     let x: String = con.hget("key0", "fkey0").unwrap();
     assert_eq!(x, "val0");
     let x: String = con.hget("key0", "fkey1").unwrap();

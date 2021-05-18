@@ -1,6 +1,12 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use crate::{command::Command, storage::{Storage, models::RedisString}};
+use crate::{
+    command::Command,
+    storage::{models::RedisString, Storage},
+};
 
 use super::*;
 
@@ -98,7 +104,7 @@ pub fn run_command_and_get_response<T: Storage>(
             Command::HSet(map_key, items) => {
                 let mut hash_map = HashMap::<RedisString, RedisString>::with_capacity(items.len());
                 // ugly and wastes space fix later
-                items.iter().for_each(|(k, v )| {
+                items.iter().for_each(|(k, v)| {
                     hash_map.insert(k.to_vec(), v.to_vec());
                 });
 
@@ -106,12 +112,14 @@ pub fn run_command_and_get_response<T: Storage>(
                 storage.hwrite(map_key, hash_map);
                 protocol::OK.to_vec()
             }
-            Command::HGet(map_key, field_key) => match lock_then_release(storage).hread(map_key.as_slice(), field_key.as_slice()) {
-                Some(value) => {
-                    let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                    res.as_bytes().to_vec()
+            Command::HGet(map_key, field_key) => {
+                match lock_then_release(storage).hread(map_key.as_slice(), field_key.as_slice()) {
+                    Some(value) => {
+                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                        res.as_bytes().to_vec()
+                    }
+                    None => protocol::NIL.to_vec(),
                 }
-                None => protocol::NIL.to_vec(),
             }
             Command::Del(k) => {
                 let total_del = lock_then_release(storage).remove(k.as_slice());

@@ -104,7 +104,8 @@ impl Storage for InMemoryStorage {
                 // good to go
                 false => {
                     // will never panic since we already checked if the key existed in data_mapper
-                    if let Some(field_value) = self.hash_store.get(key).unwrap().data.get(field_key) {
+                    if let Some(field_value) = self.hash_store.get(key).unwrap().data.get(field_key)
+                    {
                         Some(field_value)
                     } else {
                         None

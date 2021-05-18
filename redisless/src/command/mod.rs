@@ -8,7 +8,7 @@ use crate::protocol::Resp;
 use crate::storage::models::Expiry;
 use command_error::RedisCommandError;
 
-use super::storage::models::RedisString; 
+use super::storage::models::RedisString;
 
 type Key = RedisString;
 type Value = RedisString;
