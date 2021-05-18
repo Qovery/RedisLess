@@ -28,6 +28,7 @@ pub enum Command {
     MGet(Keys),
     Del(Key),
     Incr(Key),
+    IncrBy(Key, i64),
     Exists(Key),
     Info,
     Ping,
@@ -161,6 +162,11 @@ impl Command {
                 b"INCR" | b"incr" | b"Incr" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Incr(key))
+                }
+                b"INCRBY" | b"incrby" | b"IncrBy" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let increment = get_bytes_vec(v.get(2)).and_then(parse_increment)?;
+                    Ok(IncrBy(key, increment))
                 }
                 b"EXISTS" | b"exists" | b"Exists" => {
                     let key = get_bytes_vec(v.get(1))?;

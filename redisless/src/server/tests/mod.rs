@@ -55,6 +55,22 @@ fn test_redis_implementation() {
     let x: u32 = con.get("intkey").unwrap();
     assert_eq!(x, 11u32);
 
+    let _: () = con.set("intkeyby", "10").unwrap();
+    let _ = con
+        .send_packed_command(cmd("INCRBY").arg("intkeyby").arg(10).get_packed_command().as_slice())
+        .unwrap();
+
+    let x: u32 = con.get("intkeyby").unwrap();
+    assert_eq!(x, 20u32);
+
+    let _: () = con.set("intkeybyneg", "10").unwrap();
+    let _ = con
+        .send_packed_command(cmd("INCRBY").arg("intkeybyneg").arg(-5).get_packed_command().as_slice())
+        .unwrap();
+
+    let x: u32 = con.get("intkeybyneg").unwrap();
+    assert_eq!(x, 5u32);
+
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
