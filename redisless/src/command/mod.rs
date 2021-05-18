@@ -8,8 +8,10 @@ use crate::protocol::Resp;
 use crate::storage::models::Expiry;
 use command_error::RedisCommandError;
 
-type Key = Vec<u8>;
-type Value = Vec<u8>;
+use super::storage::models::RedisString; 
+
+type Key = RedisString;
+type Value = RedisString;
 type Items = Vec<(Key, Value)>;
 type Keys = Vec<Key>;
 
@@ -26,6 +28,8 @@ pub enum Command {
     Get(Key),
     GetSet(Key, Value),
     MGet(Keys),
+    HSet(Key, Items),
+    HGet(Key, Key),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -154,6 +158,35 @@ impl Command {
                     }
 
                     Ok(MGet(keys_vec))
+                }
+                b"HSET" | b"hset" | b"HMSET" | b"hmset" => {
+                    let hash_key = get_bytes_vec(v.get(1))?;
+                    let pairs = &v[2..];
+
+                    let chunk_size = 2_usize;
+                    if pairs.is_empty() || pairs.len() % chunk_size != 0 {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut items = Items::with_capacity(pairs.len());
+                    for pair in pairs.chunks_exact(chunk_size) {
+                        match pair {
+                            [key, value] => {
+                                let key = get_bytes_vec(Some(&key))?;
+                                let value = get_bytes_vec(Some(&value))?;
+                                items.push((key, value));
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    Ok(HSet(hash_key, items))
+                }
+                b"HGET" | b"hget" => {
+                    //HGet(Key, Key),
+                    let hash_key = get_bytes_vec(v.get(1))?;
+                    let field_key = get_bytes_vec(v.get(2))?;
+
+                    Ok(HGet(hash_key, field_key))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

@@ -42,7 +42,7 @@ impl Storage for InMemoryStorage {
                     self.remove(key);
                     None
                 }
-                false => Some(&self.string_store.get(key).unwrap()[..]),
+                false => Some(self.string_store.get(key).unwrap()),
             }
         } else {
             None
@@ -92,5 +92,27 @@ impl Storage for InMemoryStorage {
         self.data_mapper.insert(key.to_vec(), meta);
         self.hash_store
             .insert(key.to_vec(), RedisHashMap::new(value));
+    }
+
+    fn hread(&mut self, key: &[u8], field_key: &[u8]) -> Option<&[u8]> {
+        if let Some(meta) = self.data_mapper.get(key) {
+            match meta.is_expired() {
+                true => {
+                    self.remove(key);
+                    None
+                }
+                // good to go
+                false => {
+                    // will never panic since we already checked if the key existed in data_mapper
+                    if let Some(field_value) = self.hash_store.get(key).unwrap().data.get(field_key) {
+                        Some(field_value)
+                    } else {
+                        None
+                    }
+                }
+            }
+        } else {
+            None
+        }
     }
 }
