@@ -67,7 +67,6 @@ fn test_redis_implementation() {
     let _: () = con.set("intkeybyneg", "10").unwrap();
     let _: () = con.incr("intkeybyneg", "-5").unwrap();
 
-
     let x: u32 = con.get("intkeybyneg").unwrap();
     assert_eq!(x, 5u32);
 
