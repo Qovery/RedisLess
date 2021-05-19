@@ -123,6 +123,30 @@ pub fn run_command_and_get_response<T: Storage>(
                     }
                 }
             }
+            Command::IncrBy(k, increment) => {
+                let mut storage = lock_then_release(storage);
+
+                match storage.read(k.as_slice()) {
+                    Some(value) => {
+                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
+                        {
+                            int_val += increment;
+                            let new_value = int_val.to_string().into_bytes();
+                            storage.write(k.as_slice(), new_value.as_slice());
+
+                            format!(":{}\r\n", int_val).as_bytes().to_vec()
+                        } else {
+                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
+                                .to_vec()
+                        }
+                    }
+                    None => {
+                        let val = increment.to_string();
+                        storage.write(k, val.as_bytes());
+                        format!(":{}\r\n", val).as_bytes().to_vec()
+                    }
+                }
+            }
             Command::Exists(k) => {
                 let exists = lock_then_release(storage).contains(k);
                 let exists: u32 = match exists {
