@@ -14,6 +14,6 @@ pub fn parse_duration(bytes: Vec<u8>) -> Result<u64, RedisCommandError> {
 }
 
 pub fn parse_increment(bytes: Vec<u8>) -> Result<i64, RedisCommandError> {
-    let duration = std::str::from_utf8(&bytes[..])?;
-    Ok(duration.parse::<i64>()?)
+    let delta = std::str::from_utf8(&bytes[..])?;
+    Ok(delta.parse::<i64>()?)
 }
