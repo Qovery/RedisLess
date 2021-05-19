@@ -67,6 +67,11 @@ fn test_redis_implementation() {
     let x: u32 = con.get("intkeybyneg").unwrap();
     assert_eq!(x, 5u32);
 
+    let _: () = con.incr("keydoesnotexist", "20").unwrap();
+
+    let x: u32 = con.get("keydoesnotexist").unwrap();
+    assert_eq!(x, 20u32);
+
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
