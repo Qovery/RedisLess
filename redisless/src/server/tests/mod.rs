@@ -57,9 +57,6 @@ fn test_redis_implementation() {
 
     let _: () = con.set("intkeyby", "10").unwrap();
     let _: () = con.incr("intkeyby", "10").unwrap();
-    // let _ = con
-    //     .send_packed_command(cmd("INCRBY").arg("intkeyby").arg(10).get_packed_command().as_slice())
-    //     .unwrap();
 
     let x: u32 = con.get("intkeyby").unwrap();
     assert_eq!(x, 20u32);
