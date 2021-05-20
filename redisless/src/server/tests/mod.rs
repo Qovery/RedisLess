@@ -1,4 +1,4 @@
-use redis::{cmd, Commands, RedisError, RedisResult};
+use redis::{cmd, Commands, RedisResult};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
