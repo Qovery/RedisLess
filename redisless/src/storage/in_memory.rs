@@ -116,4 +116,8 @@ impl Storage for InMemoryStorage {
             None
         }
     }
+
+    fn size(&self) -> u64 {
+        self.data_mapper.len() as u64
+    }
 }

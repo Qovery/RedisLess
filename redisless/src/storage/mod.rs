@@ -17,4 +17,5 @@ pub trait Storage {
     fn contains(&mut self, key: &[u8]) -> bool;
     fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>);
     fn hread(&mut self, key: &[u8], field_key: &[u8]) -> Option<&[u8]>;
+    fn size(&self) -> u64;
 }

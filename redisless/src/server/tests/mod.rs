@@ -161,6 +161,28 @@ fn get_set() {
 
 #[test]
 #[serial]
+fn dbsize() {
+    let port = 3332;
+    let server = Server::new(InMemoryStorage::new(), port);
+    assert_eq!(server.start(), Some(ServerState::Started));
+
+    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+    let mut con = redis_client.get_connection().unwrap();
+
+    let _: String = con.set("key1", "valueA").unwrap();
+    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
+    assert_eq!(x, 1);
+    let _: String = con.set("key2", "valueA").unwrap();
+    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
+    assert_eq!(x, 2);
+    let _: u32 = con.del("key2").unwrap();
+    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
+    assert_eq!(x, 1);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn mset() {
     // make these first 5 lines into a macro?
     let port = 3343;
