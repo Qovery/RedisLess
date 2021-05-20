@@ -86,12 +86,12 @@ pub fn handle_request<T: Storage>(
         _ => {}
     }
 
-    let (command, res) = run_command_and_get_response(storage, &buf);
+    let (quit, res) = run_command_and_get_response(storage, &buf);
 
     let _ = stream.write(res.as_slice());
 
-    match command {
-        Some(command) if command == Command::Quit => (true, buf_length),
-        _ => (false, buf_length),
+    match quit {
+        true => (true, buf_length),
+        false => (false, buf_length),
     }
 }
