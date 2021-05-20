@@ -1,16 +1,22 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use crate::{command::Command, storage::Storage};
+use crate::{
+    command::Command,
+    storage::{models::RedisString, Storage},
+};
 
 use super::*;
 
 pub fn run_command_and_get_response<T: Storage>(
     storage: &Arc<Mutex<T>>,
     bytes: &[u8; 512],
-) -> (Option<Command>, CommandResponse) {
+) -> (bool, CommandResponse) {
     let command = get_command(bytes);
-
-    let response = match &command {
+    let mut quit = false;
+    let response = match command {
         Ok(command) => match command {
             Command::Set(k, v) => {
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
@@ -20,18 +26,18 @@ pub fn run_command_and_get_response<T: Storage>(
                 let mut storage = lock_then_release(storage);
 
                 storage.write(k.as_slice(), v.as_slice());
-                storage.expire(k.as_slice(), *expiry);
+                storage.expire(k.as_slice(), expiry);
 
                 protocol::OK.to_vec()
             }
             Command::Setnx(k, v) => {
                 let mut storage = lock_then_release(storage);
-                match storage.contains(k) {
+                match storage.contains(&k[..]) {
                     // Key exists, will not re set key
                     true => b":0\r\n".to_vec(),
                     // Key does not exist, will set key
                     false => {
-                        storage.write(k, v);
+                        storage.write(&k, &v);
                         b":1\r\n".to_vec()
                     }
                 }
@@ -55,7 +61,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 }
             }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
-                let v = lock_then_release(storage).expire(k.as_slice(), *expiry);
+                let v = lock_then_release(storage).expire(k.as_slice(), expiry);
                 format!(":{}\r\n", v).as_bytes().to_vec()
             }
             Command::Get(k) => match lock_then_release(storage).read(k.as_slice()) {
@@ -95,6 +101,26 @@ pub fn run_command_and_get_response<T: Storage>(
                 }
                 final_response.as_bytes().to_vec()
             }
+            Command::HSet(map_key, items) => {
+                let mut hash_map = HashMap::<RedisString, RedisString>::with_capacity(items.len());
+
+                for (k, v) in items {
+                    hash_map.insert(k.to_vec(), v.to_vec());
+                }
+
+                let mut storage = lock_then_release(storage);
+                storage.hwrite(&map_key, hash_map);
+                protocol::OK.to_vec()
+            }
+            Command::HGet(map_key, field_key) => {
+                match lock_then_release(storage).hread(map_key.as_slice(), field_key.as_slice()) {
+                    Some(value) => {
+                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
+                        res.as_bytes().to_vec()
+                    }
+                    None => protocol::NIL.to_vec(),
+                }
+            }
             Command::Del(k) => {
                 let total_del = lock_then_release(storage).remove(k.as_slice());
                 format!(":{}\r\n", total_del).as_bytes().to_vec()
@@ -118,7 +144,7 @@ pub fn run_command_and_get_response<T: Storage>(
                     }
                     None => {
                         let val = "1";
-                        storage.write(k, val.as_bytes());
+                        storage.write(&k, val.as_bytes());
                         format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
@@ -142,13 +168,13 @@ pub fn run_command_and_get_response<T: Storage>(
                     }
                     None => {
                         let val = increment.to_string();
-                        storage.write(k, val.as_bytes());
+                        storage.write(&k, val.as_bytes());
                         format!(":{}\r\n", val).as_bytes().to_vec()
                     }
                 }
             }
             Command::Exists(k) => {
-                let exists = lock_then_release(storage).contains(k);
+                let exists = lock_then_release(storage).contains(&k);
                 let exists: u32 = match exists {
                     true => 1,
                     false => 0,
@@ -157,10 +183,13 @@ pub fn run_command_and_get_response<T: Storage>(
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
-            Command::Quit => protocol::OK.to_vec(),
+            Command::Quit => {
+                quit = true;
+                protocol::OK.to_vec()
+            }
         },
         Err(err) => format!("-ERR {}\r\n", err).as_bytes().to_vec(),
     };
-
-    (command.ok(), response)
+    // bundle response and quit together when implementing response struct/enum
+    (quit, response)
 }

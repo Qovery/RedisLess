@@ -248,6 +248,31 @@ fn mget() {
 
 #[test]
 #[serial]
+fn hset() {
+    let port = 3347;
+    let server = Server::new(InMemoryStorage::new(), port);
+    assert_eq!(server.start(), Some(ServerState::Started));
+    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+    let mut con = redis_client.get_connection().unwrap();
+
+    let key_value_pairs = &[("fkey0", "val0"), ("fkey1", "val1"), ("fkey2", "val2")][..];
+    let _: () = con
+        .hset_multiple::<&'static str, &'static str, &'static str, ()>("key0", key_value_pairs)
+        .unwrap();
+    let x: String = con.hget("key0", "fkey0").unwrap();
+    assert_eq!(x, "val0");
+    let x: String = con.hget("key0", "fkey1").unwrap();
+    assert_eq!(x, "val1");
+    let x: String = con.hget("key0", "fkey2").unwrap();
+    assert_eq!(x, "val2");
+    let x: Option<String> = con.hget("key0", "fkey3").ok();
+    assert_eq!(x, None);
+    let x: Option<String> = con.hget("key1", "fkey3").ok();
+    assert_eq!(x, None);
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));

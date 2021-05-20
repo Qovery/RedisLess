@@ -1,15 +1,15 @@
-use super::Expiry;
 use std::time::Instant;
 
-#[derive(Debug, PartialEq)]
-pub struct RedisValue {
-    pub data: Vec<u8>,
+use super::{Expiry, RedisType};
+
+pub struct RedisMeta {
+    pub data_type: RedisType,
     pub expiry: Option<Expiry>,
 }
 
-impl RedisValue {
-    pub fn new(data: Vec<u8>, expiry: Option<Expiry>) -> Self {
-        RedisValue { data, expiry }
+impl RedisMeta {
+    pub fn new(data_type: RedisType, expiry: Option<Expiry>) -> Self {
+        Self { data_type, expiry }
     }
 
     pub fn is_expired(&self) -> bool {
