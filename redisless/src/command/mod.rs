@@ -37,6 +37,7 @@ pub enum Command {
     Info,
     Ping,
     Quit,
+    Dbsize,
 }
 
 impl Command {
@@ -207,6 +208,7 @@ impl Command {
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Ping),
+                b"DBSIZE" | b"dbsize" | b"Dbsize" => Ok(Dbsize),
                 b"QUIT" | b"quit" | b"Quit" => Ok(Quit),
                 unsupported_command => Err(NotSupported(
                     std::str::from_utf8(unsupported_command)

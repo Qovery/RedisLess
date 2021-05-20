@@ -14,6 +14,20 @@ fn test_in_memory_storage() {
 }
 
 #[test]
+fn test_dbsize() {
+    let mut mem = InMemoryStorage::new();
+    mem.write(b"key", b"xxx");
+    assert_eq!(mem.size(), 1);
+    assert_eq!(mem.remove(b"key"), 1);
+    assert_eq!(mem.size(), 0);
+    assert_eq!(mem.remove(b"key"), 0);
+    assert_eq!(mem.size(), 0);
+    mem.write(b"key", b"xxx");
+    mem.write(b"key2", b"xxx");
+    assert_eq!(mem.size(), 2);
+}
+
+#[test]
 fn test_expire() {
     let mut mem = InMemoryStorage::new();
 

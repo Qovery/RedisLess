@@ -183,6 +183,10 @@ pub fn run_command_and_get_response<T: Storage>(
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),
+            Command::Dbsize => {
+                let storage = lock_then_release(storage);
+                format!(":{}\r\n", storage.size()).as_bytes().to_vec()
+            }
             Command::Quit => {
                 quit = true;
                 protocol::OK.to_vec()
