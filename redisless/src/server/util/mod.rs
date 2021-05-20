@@ -90,8 +90,5 @@ pub fn handle_request<T: Storage>(
 
     let _ = stream.write(res.as_slice());
 
-    match quit {
-        true => (true, buf_length),
-        false => (false, buf_length),
-    }
+    (quit, buf_length)
 }
