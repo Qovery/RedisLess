@@ -169,6 +169,8 @@ fn dbsize() {
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
     let mut con = redis_client.get_connection().unwrap();
 
+    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
+    assert_eq!(x, 0);
     let _: String = con.set("key1", "valueA").unwrap();
     let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
     assert_eq!(x, 1);
