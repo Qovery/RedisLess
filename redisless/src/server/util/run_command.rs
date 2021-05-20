@@ -1,6 +1,12 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-use crate::{command::Command, storage::{Storage, models::{RedisString}}};
+use crate::{
+    command::Command,
+    storage::{models::RedisString, Storage},
+};
 
 use super::*;
 
