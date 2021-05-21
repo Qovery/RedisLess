@@ -3,6 +3,7 @@ mod tests;
 
 pub mod error;
 pub mod parser;
+pub mod response;
 
 use error::RedisError;
 
