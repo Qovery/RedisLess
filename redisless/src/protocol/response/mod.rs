@@ -50,6 +50,10 @@ impl RedisResponseType {
         let mut reply =
             Vec::<u8>::with_capacity(bytes.len() + 3 /* 3 more bytes for symbol and /r/n */);
         reply.push(symbol);
+        if symbol == b'$' {
+            reply.put_slice(bytes.len().to_string().as_bytes());
+            reply.put_slice(b"\r\n");
+        }
         //eprintln!("{:?}", bytes);
         reply.append(&mut bytes);
         reply.put_slice(b"\r\n");

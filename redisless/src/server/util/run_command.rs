@@ -166,7 +166,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 };
                 RedisResponse::single(Integer(exists))
             }
-            Command::Info => RedisResponse::array(Vec::new()), // TODO change with some real info?
+            Command::Info => RedisResponse::single(BulkString("".as_bytes().to_vec())),
             Command::Ping => RedisResponse::pong(),
             Command::Dbsize => {
                 let storage = lock_then_release(storage);
