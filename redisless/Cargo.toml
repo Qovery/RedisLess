@@ -22,6 +22,7 @@ rand = "0.8"
 prost = "0.7"
 get_if_addrs = "0.5"
 ipnet = "2.3"
+chrono = "0.4"
 
 [dev-dependencies]
 redis = "0.20"
