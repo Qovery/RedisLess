@@ -117,7 +117,7 @@ impl RedisResponse {
                 for response in responses {
                     let mut response = response.reply();
                     reply.append(&mut response);
-				}
+                }
                 reply
             }
         }
