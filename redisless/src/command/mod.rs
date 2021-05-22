@@ -17,6 +17,7 @@ type Keys = Vec<Key>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
+    Append(Key, Value),
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
@@ -53,6 +54,12 @@ impl Command {
                     let value = get_bytes_vec(v.get(2))?;
 
                     Ok(Set(key, value))
+                }
+                b"APPEND" | b"append" | b"Append" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(Append(key, value))
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
                     let key = get_bytes_vec(v.get(1))?;
