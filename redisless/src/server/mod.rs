@@ -21,7 +21,6 @@ mod util;
 
 type CloseConnection = bool;
 type ReceivedDataLength = usize;
-type CommandResponse = Vec<u8>;
 
 pub struct Server {
     server_state_bus: MPB<ServerState>,
