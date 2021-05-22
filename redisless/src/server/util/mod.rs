@@ -19,7 +19,7 @@ use crate::{
     storage::Storage,
 };
 
-use super::{CloseConnection, CommandResponse, ReceivedDataLength};
+use super::{CloseConnection, ReceivedDataLength};
 
 pub fn lock_then_release<T: Storage>(storage: &Arc<Mutex<T>>) -> MutexGuard<T> {
     loop {
@@ -86,9 +86,11 @@ pub fn handle_request<T: Storage>(
         _ => {}
     }
 
-    let (quit, res) = run_command_and_get_response(storage, &buf);
+    let res = run_command_and_get_response(storage, &buf);
+    let quit = if res.is_quit() { true } else { false };
+    let reply = res.reply();
+    //eprintln!("?{}", std::str::from_utf8(&reply).unwrap());
+    let _ = stream.write(&reply);
 
-    let _ = stream.write(res.as_slice());
-
-    (quit, buf_length)
+    (quit, 1)
 }
