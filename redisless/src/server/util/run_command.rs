@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use chrono::format::format;
+
 use crate::{
     command::Command,
     storage::{models::RedisString, Storage},
@@ -180,6 +182,30 @@ pub fn run_command_and_get_response<T: Storage>(
                     false => 0,
                 };
                 format!(":{}\r\n", exists).as_bytes().to_vec()
+            }
+            Command::Ttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis() / 1000
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                format!(":{}\r\n", ttl).as_bytes().to_vec()
+            }
+            Command::Pttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis()
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                format!(":{}\r\n", ttl).as_bytes().to_vec()
             }
             Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
             Command::Ping => protocol::PONG.to_vec(),

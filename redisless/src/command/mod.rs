@@ -34,6 +34,8 @@ pub enum Command {
     Incr(Key),
     IncrBy(Key, i64),
     Exists(Key),
+    Ttl(Key),
+    Pttl(Key),
     Info,
     Ping,
     Quit,
@@ -205,6 +207,14 @@ impl Command {
                 b"EXISTS" | b"exists" | b"Exists" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Exists(key))
+                }
+                b"TTL" | b"ttl" | b"Ttl" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Ttl(key))
+                }
+                b"PTTL" | b"pttl" | b"Pttl" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Pttl(key))
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Ping),
