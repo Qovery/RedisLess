@@ -3,8 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use chrono::format::format;
+
 use crate::{
     command::Command,
+    protocol::response::{RedisResponse, RedisResponseType},
     storage::{models::RedisString, Storage},
 };
 
@@ -13,14 +16,18 @@ use super::*;
 pub fn run_command_and_get_response<T: Storage>(
     storage: &Arc<Mutex<T>>,
     bytes: &[u8; 512],
-) -> (bool, CommandResponse) {
+) -> RedisResponse {
+    use protocol::response::RedisResponseType::*;
     let command = get_command(bytes);
-    let mut quit = false;
     let response = match command {
         Ok(command) => match command {
             Command::Set(k, v) => {
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
-                protocol::OK.to_vec()
+                RedisResponse::okay()
+            }
+            Command::Append(k, v) => {
+                let len = lock_then_release(storage).extend(k.as_slice(), v.as_slice());
+                RedisResponse::single(Integer(len as i64))
             }
             Command::Setex(k, expiry, v) | Command::PSetex(k, expiry, v) => {
                 let mut storage = lock_then_release(storage);
@@ -28,24 +35,24 @@ pub fn run_command_and_get_response<T: Storage>(
                 storage.write(k.as_slice(), v.as_slice());
                 storage.expire(k.as_slice(), expiry);
 
-                protocol::OK.to_vec()
+                RedisResponse::okay()
             }
             Command::Setnx(k, v) => {
                 let mut storage = lock_then_release(storage);
                 match storage.contains(&k[..]) {
                     // Key exists, will not re set key
-                    true => b":0\r\n".to_vec(),
+                    true => RedisResponse::single(Integer(0)),
                     // Key does not exist, will set key
                     false => {
                         storage.write(&k, &v);
-                        b":1\r\n".to_vec()
+                        RedisResponse::single(Integer(1))
                     }
                 }
             }
             Command::MSet(items) => {
                 let mut storage = lock_then_release(storage);
                 items.iter().for_each(|(k, v)| storage.write(k, v));
-                protocol::OK.to_vec()
+                RedisResponse::okay()
             }
             Command::MSetnx(items) => {
                 // Either set all or not set any at all if any already exist
@@ -54,52 +61,41 @@ pub fn run_command_and_get_response<T: Storage>(
                     // None of the keys already exist in the storage
                     true => {
                         items.iter().for_each(|(k, v)| storage.write(k, v));
-                        b":1\r\n".to_vec()
+                        RedisResponse::single(Integer(1))
                     }
                     // Some key exists, don't write any of the keys
-                    false => b":0\r\n".to_vec(),
+                    false => RedisResponse::single(Integer(0)),
                 }
             }
             Command::Expire(k, expiry) | Command::PExpire(k, expiry) => {
-                let v = lock_then_release(storage).expire(k.as_slice(), expiry);
-                format!(":{}\r\n", v).as_bytes().to_vec()
+                let e = lock_then_release(storage).expire(k.as_slice(), expiry);
+                RedisResponse::single(Integer(e as i64))
             }
             Command::Get(k) => match lock_then_release(storage).read(k.as_slice()) {
-                Some(value) => {
-                    let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                    res.as_bytes().to_vec()
-                }
-                None => protocol::NIL.to_vec(),
+                Some(value) => RedisResponse::single(SimpleString(value.to_vec())),
+                None => RedisResponse::single(Nil),
             },
             Command::GetSet(k, v) => {
                 let mut storage = lock_then_release(storage);
 
                 let response = match storage.read(k.as_slice()) {
-                    Some(value) => {
-                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                        res.as_bytes().to_vec()
-                    }
-                    None => protocol::NIL.to_vec(),
+                    Some(value) => RedisResponse::single(SimpleString(value.to_vec())),
+                    None => RedisResponse::single(Nil),
                 };
                 storage.write(k.as_slice(), v.as_slice());
                 response
             }
             Command::MGet(keys) => {
-                // Draft, slow ?
-                // better to add a response formatter module?
                 let mut storage = lock_then_release(storage);
-                let mut final_response = format!("*{}\r\n", keys.len());
-
+                let mut responses = Vec::<RedisResponseType>::with_capacity(keys.len());
                 for key in keys {
-                    let response_line = match storage.read(key.as_slice()) {
-                        Some(value) => {
-                            format!("+{}\r\n", std::str::from_utf8(value).unwrap())
-                        }
-                        None => "$-1\r\n".to_string(),
+                    let response = match storage.read(key.as_slice()) {
+                        Some(value) => RedisResponseType::SimpleString(value.to_vec()),
+                        None => RedisResponseType::Nil,
                     };
-                    final_response.push_str(response_line.as_str());
+                    responses.push(response);
                 }
-                final_response.as_bytes().to_vec()
+                RedisResponse::array(responses)
             }
             Command::HSet(map_key, items) => {
                 let mut hash_map = HashMap::<RedisString, RedisString>::with_capacity(items.len());
@@ -110,20 +106,17 @@ pub fn run_command_and_get_response<T: Storage>(
 
                 let mut storage = lock_then_release(storage);
                 storage.hwrite(&map_key, hash_map);
-                protocol::OK.to_vec()
+                RedisResponse::okay()
             }
             Command::HGet(map_key, field_key) => {
                 match lock_then_release(storage).hread(map_key.as_slice(), field_key.as_slice()) {
-                    Some(value) => {
-                        let res = format!("+{}\r\n", std::str::from_utf8(value).unwrap());
-                        res.as_bytes().to_vec()
-                    }
-                    None => protocol::NIL.to_vec(),
+                    Some(value) => RedisResponse::single(SimpleString(value.to_vec())),
+                    None => RedisResponse::single(Nil),
                 }
             }
             Command::Del(k) => {
-                let total_del = lock_then_release(storage).remove(k.as_slice());
-                format!(":{}\r\n", total_del).as_bytes().to_vec()
+                let d = lock_then_release(storage).remove(k.as_slice());
+                RedisResponse::single(Integer(d as i64))
             }
             Command::Incr(k) => {
                 let mut storage = lock_then_release(storage);
@@ -135,17 +128,16 @@ pub fn run_command_and_get_response<T: Storage>(
                             int_val += 1;
                             let new_value = int_val.to_string().into_bytes();
                             storage.write(k.as_slice(), new_value.as_slice());
-
-                            format!(":{}\r\n", int_val).as_bytes().to_vec()
+                            RedisResponse::single(Integer(int_val as i64))
                         } else {
-                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
-                                .to_vec()
+                            // handle this error
+                            unimplemented!()
                         }
                     }
                     None => {
                         let val = "1";
                         storage.write(&k, val.as_bytes());
-                        format!(":{}\r\n", val).as_bytes().to_vec()
+                        RedisResponse::single(Integer(1))
                     }
                 }
             }
@@ -159,17 +151,16 @@ pub fn run_command_and_get_response<T: Storage>(
                             int_val += increment;
                             let new_value = int_val.to_string().into_bytes();
                             storage.write(k.as_slice(), new_value.as_slice());
-
-                            format!(":{}\r\n", int_val).as_bytes().to_vec()
+                            RedisResponse::single(Integer(int_val as i64))
                         } else {
-                            b"-WRONGTYPE Operation against a key holding the wrong kind of value}}"
-                                .to_vec()
+                            //RedisResponse::error(...)
+                            unimplemented!()
                         }
                     }
                     None => {
                         let val = increment.to_string();
                         storage.write(&k, val.as_bytes());
-                        format!(":{}\r\n", val).as_bytes().to_vec()
+                        RedisResponse::single(Integer(increment))
                     }
                 }
             }
@@ -180,25 +171,46 @@ pub fn run_command_and_get_response<T: Storage>(
             }
             Command::Exists(k) => {
                 let exists = lock_then_release(storage).contains(&k);
-                let exists: u32 = match exists {
+                let exists: i64 = match exists {
                     true => 1,
                     false => 0,
                 };
-                format!(":{}\r\n", exists).as_bytes().to_vec()
+                RedisResponse::single(Integer(exists))
             }
-            Command::Info => protocol::EMPTY_LIST.to_vec(), // TODO change with some real info?
-            Command::Ping => protocol::PONG.to_vec(),
+            Command::Ttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis() / 1000
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                RedisResponse::single(Integer(ttl))
+            }
+            Command::Pttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis()
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                RedisResponse::single(Integer(ttl))
+            }
+            Command::Info => RedisResponse::single(BulkString("".as_bytes().to_vec())),
+            Command::Ping => RedisResponse::pong(),
             Command::Dbsize => {
                 let storage = lock_then_release(storage);
-                format!(":{}\r\n", storage.size()).as_bytes().to_vec()
+                let size = storage.size() as i64;
+                RedisResponse::single(Integer(size))
             }
-            Command::Quit => {
-                quit = true;
-                protocol::OK.to_vec()
-            }
+            Command::Quit => RedisResponse::quit(),
         },
-        Err(err) => format!("-ERR {}\r\n", err).as_bytes().to_vec(),
+        Err(err) => RedisResponse::error(err),
     };
-    // bundle response and quit together when implementing response struct/enum
-    (quit, response)
+    response
 }

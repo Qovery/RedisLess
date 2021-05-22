@@ -17,6 +17,7 @@ type Keys = Vec<Key>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
+    Append(Key, Value),
     Set(Key, Value),
     Setnx(Key, Value),
     Setex(Key, Expiry, Value),
@@ -35,6 +36,8 @@ pub enum Command {
     IncrBy(Key, i64),
     Exists(Key),
     Type(Key),
+    Ttl(Key),
+    Pttl(Key),
     Info,
     Ping,
     Quit,
@@ -54,6 +57,12 @@ impl Command {
                     let value = get_bytes_vec(v.get(2))?;
 
                     Ok(Set(key, value))
+                }
+                b"APPEND" | b"append" | b"Append" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let value = get_bytes_vec(v.get(2))?;
+
+                    Ok(Append(key, value))
                 }
                 b"SETEX" | b"setex" | b"SetEx" | b"Setex" => {
                     let key = get_bytes_vec(v.get(1))?;
@@ -219,6 +228,14 @@ impl Command {
                 b"TYPE" | b"type" | b"Type" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Type(key))
+                }
+                b"TTL" | b"ttl" | b"Ttl" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Ttl(key))
+                }
+                b"PTTL" | b"pttl" | b"Pttl" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Pttl(key))
                 }
                 b"INFO" | b"info" | b"Info" => Ok(Info),
                 b"PING" | b"ping" | b"Ping" => Ok(Ping),

@@ -24,6 +24,12 @@ pub enum RedisCommandError {
     CommandNotFound,
 }
 
+impl RedisCommandError {
+    pub fn to_vec(self) -> Vec<u8> {
+        format!("-{}\r\n", self).as_bytes().to_vec()
+    }
+}
+
 impl Display for RedisCommandError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
