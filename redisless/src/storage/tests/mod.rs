@@ -61,3 +61,17 @@ fn contains() {
     let x = mem.contains(b"key2");
     assert_eq!(x, false);
 }
+
+#[test]
+fn extend() {
+    let mut mem = InMemoryStorage::new();
+    mem.write(b"key1", b"val");
+    let len = mem.extend(b"key1", b"ue1");
+    assert_eq!(len, 6);
+    let x = mem.read(b"key1").unwrap();
+    assert_eq!(x, b"value1");
+    let len = mem.extend(b"key2", b"value222");
+    let x = mem.read(b"key2").unwrap();
+    assert_eq!(len, 8);
+    assert_eq!(x, b"value222");
+}

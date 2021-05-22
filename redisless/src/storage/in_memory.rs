@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use prost::bytes::BufMut;
+
 use super::models::*;
 use crate::storage::Storage;
 
@@ -24,6 +26,18 @@ impl Storage for InMemoryStorage {
         let meta = RedisMeta::new(RedisType::String, None);
         self.data_mapper.insert(key.to_vec(), meta);
         self.string_store.insert(key.to_vec(), value.to_vec());
+    }
+    fn extend(&mut self, key: &[u8], tail: &[u8]) -> u64 {
+        match self.string_store.get_mut(key) {
+            Some(v) => {
+                v.put_slice(tail);
+                v.len() as u64
+            }
+            None => {
+                self.write(key, tail);
+                tail.len() as u64
+            }
+        }
     }
 
     fn expire(&mut self, key: &[u8], expiry: Expiry) -> u32 {

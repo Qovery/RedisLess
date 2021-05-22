@@ -23,6 +23,10 @@ pub fn run_command_and_get_response<T: Storage>(
                 lock_then_release(storage).write(k.as_slice(), v.as_slice());
                 RedisResponse::okay()
             }
+            Command::Append(k, v) => {
+                let len = lock_then_release(storage).extend(k.as_slice(), v.as_slice());
+                RedisResponse::single(Integer(len as i64))
+            }
             Command::Setex(k, expiry, v) | Command::PSetex(k, expiry, v) => {
                 let mut storage = lock_then_release(storage);
 

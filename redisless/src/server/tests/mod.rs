@@ -311,3 +311,25 @@ fn start_and_stop_server_multiple_times() {
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
 }
+
+#[test]
+fn append() {
+    let port = 3346;
+    let server = Server::new(InMemoryStorage::new(), port);
+    assert_eq!(server.start(), Some(ServerState::Started));
+    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+    let mut con = redis_client.get_connection().unwrap();
+
+    let _: String = con.set("key1", "value1").unwrap();
+    let len: usize = con.append("key1", "value1").unwrap();
+    assert_eq!(len, 12);
+    let x: String = con.get("key1").unwrap();
+    assert_eq!(x, "value1value1");
+
+    let len: usize = con.append("key2", "value2").unwrap();
+    assert_eq!(len, 6);
+    let x: String = con.get("key2").unwrap();
+    assert_eq!(x, "value2");
+
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
