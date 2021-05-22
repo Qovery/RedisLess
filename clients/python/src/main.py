@@ -14,6 +14,10 @@ if __name__ == '__main__':
     for _ in range(20):
         assert redis.ping()
 
+        redis.set('n', 8)
+        assert redis.incr('n') == 9
+        assert redis.decr('n') == 8
+
         redis.set('key', 'value')
         assert redis.get('key') == b'value'
 
