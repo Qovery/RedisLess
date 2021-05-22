@@ -77,21 +77,31 @@ fn test_redis_implementation() {
 
 #[test]
 #[serial]
-fn expire() {
+fn expire_and_ttl() {
     let port = 3359;
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
     let mut con = redis_client.get_connection().unwrap();
 
+    let ttl: i32 = con.ttl("key").unwrap();
+    assert_eq!(ttl, -2);
+    let ttl: i32 = con.pttl("key").unwrap();
+    assert_eq!(ttl, -2);
     // EXPIRE
-    let duration: usize = 2;
+    let duration: usize = 50;
     let _: () = con.set("key", "value").unwrap();
     let x: String = con.get("key").unwrap();
     assert_eq!(x, "value");
+    let ttl: i32 = con.ttl("key").unwrap();
+    assert_eq!(ttl, -1);
 
     let ret_val: u32 = con.pexpire("key", duration).unwrap();
     assert_eq!(ret_val, 1);
+    let ttl: i32 = con.pttl("key").unwrap();
+    assert!(ttl <= duration as i32 && duration as i32 - 3 < ttl);
+    let ttl: i32 = con.ttl("key").unwrap();
+    assert_eq!(ttl, (duration / 1000) as i32);
     sleep(Duration::from_millis(duration as u64));
     let x: Option<String> = con.get("key").ok();
     assert_eq!(x, None);
@@ -104,9 +114,13 @@ fn expire() {
 
     let ret_val: u32 = con.pexpire("key", duration).unwrap();
     assert_eq!(ret_val, 1);
+    let ttl: i32 = con.pttl("key").unwrap();
+    assert!(ttl <= duration as i32 && duration as i32 - 3 < ttl);
     sleep(Duration::from_millis(duration as u64));
     let x: Option<String> = con.get("key").ok();
     assert_eq!(x, None);
+    let ttl: i32 = con.pttl("key").unwrap();
+    assert_eq!(ttl, -2);
 
     // SETEX
     let duration: usize = 2;

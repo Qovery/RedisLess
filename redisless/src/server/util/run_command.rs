@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use chrono::format::format;
+
 use crate::{
     command::Command,
     protocol::response::{RedisResponse, RedisResponseType},
@@ -169,6 +171,30 @@ pub fn run_command_and_get_response<T: Storage>(
                     false => 0,
                 };
                 RedisResponse::single(Integer(exists))
+            }
+            Command::Ttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis() / 1000
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                RedisResponse::single(Integer(ttl))
+            }
+            Command::Pttl(k) => {
+                let ttl = if let Some(meta) = lock_then_release(storage).meta(&k) {
+                    if let Some(expiry) = meta.expiry {
+                        expiry.duration_left_millis()
+                    } else {
+                        -1
+                    }
+                } else {
+                    -2
+                };
+                RedisResponse::single(Integer(ttl))
             }
             Command::Info => RedisResponse::single(BulkString("".as_bytes().to_vec())),
             Command::Ping => RedisResponse::pong(),

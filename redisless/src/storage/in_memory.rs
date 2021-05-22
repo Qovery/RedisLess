@@ -63,6 +63,10 @@ impl Storage for InMemoryStorage {
         }
     }
 
+    fn meta(&self, key: &[u8]) -> Option<&RedisMeta> {
+        self.data_mapper.get(key)
+    }
+
     fn remove(&mut self, key: &[u8]) -> u32 {
         use RedisType::*;
         match self.data_mapper.remove_entry(key) {
