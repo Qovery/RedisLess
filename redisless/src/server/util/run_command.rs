@@ -3,7 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{command::Command, protocol::response::{RedisResponse, RedisResponseType}, storage::{models::RedisString, Storage}};
+use crate::{
+    command::Command,
+    protocol::response::{RedisResponse, RedisResponseType},
+    storage::{models::RedisString, Storage},
+};
 
 use super::*;
 
