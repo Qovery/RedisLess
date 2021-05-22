@@ -3,11 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{
-    command::Command,
-    protocol::response::RedisResponse,
-    storage::{models::RedisString, Storage},
-};
+use crate::{command::Command, protocol::response::{RedisResponse, RedisResponseType}, storage::{models::RedisString, Storage}};
 
 use super::*;
 
@@ -81,11 +77,11 @@ pub fn run_command_and_get_response<T: Storage>(
             }
             Command::MGet(keys) => {
                 let mut storage = lock_then_release(storage);
-                let mut responses = Vec::<RedisResponse>::with_capacity(keys.len());
+                let mut responses = Vec::<RedisResponseType>::with_capacity(keys.len());
                 for key in keys {
                     let response = match storage.read(key.as_slice()) {
-                        Some(value) => RedisResponse::single(SimpleString(value.to_vec())),
-                        None => RedisResponse::single(Nil),
+                        Some(value) => RedisResponseType::SimpleString(value.to_vec()),
+                        None => RedisResponseType::Nil,
                     };
                     responses.push(response);
                 }
@@ -171,7 +167,6 @@ pub fn run_command_and_get_response<T: Storage>(
             Command::Dbsize => {
                 let storage = lock_then_release(storage);
                 let size = storage.size() as i64;
-                //println!("{}", size);
                 RedisResponse::single(Integer(size))
             }
             Command::Quit => RedisResponse::quit(),

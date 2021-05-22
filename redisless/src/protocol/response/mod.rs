@@ -11,15 +11,12 @@ pub enum RedisResponseType {
 }
 
 pub struct RedisResponse {
-    // either a single response or an array of responses
     responses: RedisResponseInner,
 }
 
 enum RedisResponseInner {
     Single(RedisResponseType),
-    // This would technically allow there to be an array of arrays
-    // or an array of with a quit or pong response which is just bad design
-    Array(Vec<RedisResponse>),
+    Array(Vec<RedisResponseType>),
     Error(RedisCommandError),
     Okay,
     Pong,
@@ -90,9 +87,9 @@ impl RedisResponse {
         }
     }
 
-    pub fn array(response: Vec<RedisResponse>) -> Self {
+    pub fn array(responses: Vec<RedisResponseType>) -> Self {
         Self {
-            responses: RedisResponseInner::Array(response),
+            responses: RedisResponseInner::Array(responses),
         }
     }
 
@@ -115,7 +112,7 @@ impl RedisResponse {
                 reply.put_slice(&responses.len().to_string().as_bytes().to_vec());
                 reply.put_slice(b"\r\n");
                 for response in responses {
-                    let mut response = response.reply();
+                    let mut response = response.get_formatted();
                     reply.append(&mut response);
                 }
                 reply
