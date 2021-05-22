@@ -44,7 +44,7 @@ pub fn run_command_and_get_response<T: Storage>(
                     false => {
                         storage.write(&k, &v);
                         RedisResponse::single(Integer(1))
-                    } // 512 000 000
+                    }
                 }
             }
             Command::MSet(items) => {
