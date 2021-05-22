@@ -18,7 +18,7 @@ pub trait Storage {
     fn read(&mut self, key: &[u8]) -> Option<&[u8]>;
     fn remove(&mut self, key: &[u8]) -> u32;
     fn contains(&mut self, key: &[u8]) -> bool;
-    fn value_type(&mut self, key: &[u8]) -> &str;
+    fn value_type(&mut self, key: &[u8]) -> &[u8];
     fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>);
     fn hread(&mut self, key: &[u8], field_key: &[u8]) -> Option<&[u8]>;
     fn size(&self) -> u64;
