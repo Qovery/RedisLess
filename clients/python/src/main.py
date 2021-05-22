@@ -20,6 +20,7 @@ if __name__ == '__main__':
 
         redis.set('key', 'value')
         assert redis.get('key') == b'value'
+        assert redis.type('key') == b'string'
 
         assert redis.get('key2') is None
         assert redis.get('not existing key') is None
