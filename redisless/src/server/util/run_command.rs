@@ -166,7 +166,7 @@ pub fn run_command_and_get_response<T: Storage>(
             }
             Command::Type(k) => {
                 let mut s = lock_then_release(storage);
-                let value_type = s.value_type(k.as_slice());
+                let value_type = s.type_of(k.as_slice());
                 RedisResponse::single(SimpleString(value_type.to_vec()))
             }
             Command::Exists(k) => {

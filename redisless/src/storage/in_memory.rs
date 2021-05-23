@@ -105,14 +105,27 @@ impl Storage for InMemoryStorage {
         }
     }
 
-    fn value_type(&mut self, key: &[u8]) -> &[u8] {
-        match self.data_mapper.get(key) {
-            Some(RedisMeta {data_type: RedisType::String, ..}) => "string".as_bytes(),
-            Some(RedisMeta {data_type: RedisType::List, ..}) => "list".as_bytes(),
-            Some(RedisMeta {data_type: RedisType::Set, ..}) => "set".as_bytes(),
-            Some(RedisMeta {data_type: RedisType::Hash, ..}) => "hash".as_bytes(),
-            None => "none".as_bytes(),
-        }
+    fn type_of(&mut self, key: &[u8]) -> &[u8] {
+        let t = match self.meta(key) {
+            Some(RedisMeta {
+                data_type: RedisType::String,
+                ..
+            }) => "string",
+            Some(RedisMeta {
+                data_type: RedisType::List,
+                ..
+            }) => "list",
+            Some(RedisMeta {
+                data_type: RedisType::Set,
+                ..
+            }) => "set",
+            Some(RedisMeta {
+                data_type: RedisType::Hash,
+                ..
+            }) => "hash",
+            None => "none",
+        };
+        t.as_bytes()
     }
 
     fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>) {
