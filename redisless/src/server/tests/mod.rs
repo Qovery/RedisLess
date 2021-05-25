@@ -1,4 +1,4 @@
-use redis::{cmd, Commands, Connection, RedisResult};
+use redis::{Commands, Connection, RedisResult};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
@@ -8,6 +8,7 @@ use crate::Server;
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
+
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
     (server, redis_client.get_connection().unwrap())
 }
@@ -17,47 +18,22 @@ fn test_incr_decr_commands() {
     let (server, mut con) = get_redis_client_connection(3365);
 
     let _: () = con.set("some_number", "12").unwrap();
-    let _ = con
-        .send_packed_command(
-            cmd("INCR")
-                .arg("some_number")
-                .get_packed_command()
-                .as_slice(),
-        )
-        .unwrap();
+    let _: () = con.incr("some_number", 1).unwrap();
     let some_number: u32 = con.get("some_number").unwrap();
     assert_eq!(some_number, 13_u32);
 
     let _: () = con.set("n", "100").unwrap();
-    let _ = con
-        .send_packed_command(cmd("DECR").arg("n").get_packed_command().as_slice())
-        .unwrap();
+    let _: () = con.decr("n", 1).unwrap();
     let n: u32 = con.get("n").unwrap();
     assert_eq!(n, 99_u32);
 
     let _: () = con.set("0", "12").unwrap();
-    let _ = con
-        .send_packed_command(
-            cmd("INCRBY")
-                .arg("0")
-                .arg("500")
-                .get_packed_command()
-                .as_slice(),
-        )
-        .unwrap();
+    let _: () = con.incr("0", 500).unwrap();
     let value: u32 = con.get("0").unwrap();
     assert_eq!(value, 512_u32);
 
     let _: () = con.set("63", "89").unwrap();
-    let _ = con
-        .send_packed_command(
-            cmd("DECRBY")
-                .arg("63")
-                .arg("10")
-                .get_packed_command()
-                .as_slice(),
-        )
-        .unwrap();
+    let _: () = con.decr("63", 10).unwrap();
     let value: u32 = con.get("63").unwrap();
     assert_eq!(value, 79_u32);
 
@@ -103,9 +79,7 @@ fn test_redis_implementation() {
     assert_eq!(x, "value3");
 
     let _: () = con.set("intkey", "10").unwrap();
-    let _ = con
-        .send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice())
-        .unwrap();
+    let _: () = con.incr("intkey", 1).unwrap();
 
     let x: u32 = con.get("intkey").unwrap();
     assert_eq!(x, 11u32);
@@ -288,7 +262,7 @@ fn mset_nx() {
 #[test]
 #[serial]
 fn mget() {
-    let (server, mut con) = get_redis_client_connection(3346);
+    let (server, mut con) = get_redis_client_connection(3345);
 
     let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
