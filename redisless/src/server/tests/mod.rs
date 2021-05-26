@@ -1,18 +1,49 @@
-use redis::{cmd, Commands, RedisResult};
+use redis::{Commands, Connection, RedisResult};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
 use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
 
+fn get_redis_client_connection(port: u16) -> (Server, Connection) {
+    let server = Server::new(InMemoryStorage::new(), port);
+    assert_eq!(server.start(), Some(ServerState::Started));
+
+    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+    (server, redis_client.get_connection().unwrap())
+}
+#[test]
+#[serial]
+fn test_incr_decr_commands() {
+    let (server, mut con) = get_redis_client_connection(3365);
+
+    let _: () = con.set("some_number", "12").unwrap();
+    let _: () = con.incr("some_number", 1).unwrap();
+    let some_number: u32 = con.get("some_number").unwrap();
+    assert_eq!(some_number, 13_u32);
+
+    let _: () = con.set("n", "100").unwrap();
+    let _: () = con.decr("n", 1).unwrap();
+    let n: u32 = con.get("n").unwrap();
+    assert_eq!(n, 99_u32);
+
+    let _: () = con.set("0", "12").unwrap();
+    let _: () = con.incr("0", 500).unwrap();
+    let value: u32 = con.get("0").unwrap();
+    assert_eq!(value, 512_u32);
+
+    let _: () = con.set("63", "89").unwrap();
+    let _: () = con.decr("63", 10).unwrap();
+    let value: u32 = con.get("63").unwrap();
+    assert_eq!(value, 79_u32);
+
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
 #[test]
 #[serial]
 fn test_redis_implementation() {
-    let port = 3366;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3366);
 
     let _: () = con.set("key", "value").unwrap();
     let exists: bool = con.exists("key").unwrap();
@@ -48,9 +79,7 @@ fn test_redis_implementation() {
     assert_eq!(x, "value3");
 
     let _: () = con.set("intkey", "10").unwrap();
-    let _ = con
-        .send_packed_command(cmd("INCR").arg("intkey").get_packed_command().as_slice())
-        .unwrap();
+    let _: () = con.incr("intkey", 1).unwrap();
 
     let x: u32 = con.get("intkey").unwrap();
     assert_eq!(x, 11u32);
@@ -78,11 +107,7 @@ fn test_redis_implementation() {
 #[test]
 #[serial]
 fn expire_and_ttl() {
-    let port = 3359;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3369);
 
     let ttl: i32 = con.ttl("key").unwrap();
     assert_eq!(ttl, -2);
@@ -99,7 +124,7 @@ fn expire_and_ttl() {
     let ret_val: u32 = con.pexpire("key", duration).unwrap();
     assert_eq!(ret_val, 1);
     let ttl: i32 = con.pttl("key").unwrap();
-    assert!(ttl <= duration as i32 && duration as i32 - 3 < ttl);
+    assert!(ttl <= duration as i32 && duration as i32 - 30 < ttl);
     let ttl: i32 = con.ttl("key").unwrap();
     assert_eq!(ttl, (duration / 1000) as i32);
     sleep(Duration::from_millis(duration as u64));
@@ -115,7 +140,7 @@ fn expire_and_ttl() {
     let ret_val: u32 = con.pexpire("key", duration).unwrap();
     assert_eq!(ret_val, 1);
     let ttl: i32 = con.pttl("key").unwrap();
-    assert!(ttl <= duration as i32 && duration as i32 - 3 < ttl);
+    assert!(ttl <= duration as i32 && duration as i32 - 30 < ttl);
     sleep(Duration::from_millis(duration as u64));
     let x: Option<String> = con.get("key").ok();
     assert_eq!(x, None);
@@ -147,12 +172,7 @@ fn expire_and_ttl() {
 #[test]
 #[serial]
 fn get_set() {
-    let port = 3332;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3332);
 
     let _: String = con.set("key1", "valueA").unwrap();
     let x: String = con.getset("key1", "valueB").unwrap();
@@ -176,12 +196,7 @@ fn get_set() {
 #[test]
 #[serial]
 fn dbsize() {
-    let port = 3332;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3331);
 
     let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
     assert_eq!(x, 0);
@@ -200,12 +215,7 @@ fn dbsize() {
 #[test]
 #[serial]
 fn mset() {
-    // make these first 5 lines into a macro?
-    let port = 3343;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3343);
 
     let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
@@ -222,11 +232,7 @@ fn mset() {
 #[test]
 #[serial]
 fn mset_nx() {
-    let port = 3342;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3342);
 
     let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
@@ -256,11 +262,7 @@ fn mset_nx() {
 #[test]
 #[serial]
 fn mget() {
-    let port = 3346;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3345);
 
     let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
 
@@ -287,11 +289,7 @@ fn mget() {
 #[test]
 #[serial]
 fn hset() {
-    let port = 3347;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3347);
 
     let key_value_pairs = &[("fkey0", "val0"), ("fkey1", "val1"), ("fkey2", "val2")][..];
     let _: () = con
@@ -307,6 +305,8 @@ fn hset() {
     assert_eq!(x, None);
     let x: Option<String> = con.hget("key1", "fkey3").ok();
     assert_eq!(x, None);
+
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
 #[test]
@@ -328,11 +328,7 @@ fn start_and_stop_server_multiple_times() {
 
 #[test]
 fn append() {
-    let port = 3346;
-    let server = Server::new(InMemoryStorage::new(), port);
-    assert_eq!(server.start(), Some(ServerState::Started));
-    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
-    let mut con = redis_client.get_connection().unwrap();
+    let (server, mut con) = get_redis_client_connection(3346);
 
     let _: String = con.set("key1", "value1").unwrap();
     let len: usize = con.append("key1", "value1").unwrap();

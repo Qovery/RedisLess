@@ -35,6 +35,7 @@ pub enum Command {
     Incr(Key),
     IncrBy(Key, i64),
     Exists(Key),
+    Type(Key),
     Ttl(Key),
     Pttl(Key),
     Info,
@@ -208,12 +209,25 @@ impl Command {
                 }
                 b"INCRBY" | b"incrby" | b"IncrBy" => {
                     let key = get_bytes_vec(v.get(1))?;
-                    let increment = get_bytes_vec(v.get(2)).and_then(parse_increment)?;
+                    let increment = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
                     Ok(IncrBy(key, increment))
+                }
+                b"DECR" | b"decr" | b"Decr" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(IncrBy(key, -1))
+                }
+                b"DECRBY" | b"decrby" | b"DecrBy" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let decrement = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
+                    Ok(IncrBy(key, -decrement))
                 }
                 b"EXISTS" | b"exists" | b"Exists" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Exists(key))
+                }
+                b"TYPE" | b"type" | b"Type" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(Type(key))
                 }
                 b"TTL" | b"ttl" | b"Ttl" => {
                     let key = get_bytes_vec(v.get(1))?;
