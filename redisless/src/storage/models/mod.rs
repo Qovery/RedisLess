@@ -1,12 +1,12 @@
 pub mod expiry;
 pub mod hash;
-pub mod meta;
+pub mod zeta;
 
 // re-export so one can use with models::Expiry
 // rather than models::expiry::Expiry
 pub use expiry::Expiry;
 pub use hash::RedisHashMap;
-pub use meta::RedisMeta;
+pub use zeta::RedisMeta;
 
 pub type RedisString = Vec<u8>;
 

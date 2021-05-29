@@ -1,6 +1,7 @@
 use redis::{Commands, Connection, RedisResult};
 use std::{thread::sleep, time::Duration};
 
+use crate::command::command_error::RedisCommandError;
 use crate::server::ServerState;
 use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
@@ -36,6 +37,18 @@ fn test_incr_decr_commands() {
     let _: () = con.decr("63", 10).unwrap();
     let value: u32 = con.get("63").unwrap();
     assert_eq!(value, 79_u32);
+
+    let response: Result<i64, redis::RedisError> = con.incr("63", "foo");
+    match response {
+        Ok(_) => panic!("got valid response from incr command for key {} and value {}", "63", "foo"),
+        Err(error) => {
+            assert_eq!(error.kind(), redis::ErrorKind::ExtensionError);
+            match error.detail() {
+                None => panic!("returned error was None"),
+                Some(error_string) => assert_eq!(error_string, "invalid digit found in string"),
+            }
+        }
+    };
 
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
