@@ -123,15 +123,16 @@ pub fn run_command_and_get_response<T: Storage>(
 
                 match storage.read(k.as_slice()) {
                     Some(value) => {
-                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
-                        {
-                            int_val += 1;
-                            let new_value = int_val.to_string().into_bytes();
-                            storage.write(k.as_slice(), new_value.as_slice());
-                            RedisResponse::single(Integer(int_val as i64))
-                        } else {
-                            // handle this error
-                            unimplemented!()
+                        match std::str::from_utf8(value).unwrap().parse::<i64>() {
+                            Ok(int_val) => {
+                                int_val += 1;
+                                let new_value = int_val.to_string().into_bytes();
+                                storage.write(k.as_slice(), new_value.as_slice());
+                                RedisResponse::single(Integer(int_val as i64))
+                            }
+                            Err(error) => {
+                                RedisResponse::error(RedisCommandError::IntParse(err))
+                            }
                         }
                     }
                     None => {
@@ -146,15 +147,16 @@ pub fn run_command_and_get_response<T: Storage>(
 
                 match storage.read(k.as_slice()) {
                     Some(value) => {
-                        if let Ok(mut int_val) = std::str::from_utf8(value).unwrap().parse::<i64>()
-                        {
-                            int_val += increment;
-                            let new_value = int_val.to_string().into_bytes();
-                            storage.write(k.as_slice(), new_value.as_slice());
-                            RedisResponse::single(Integer(int_val as i64))
-                        } else {
-                            //RedisResponse::error(...)
-                            unimplemented!()
+                        match std::str::from_utf8(value).unwrap().parse::<i64>() {
+                            Ok(int_val) => {
+                                int_val += increment;
+                                let new_value = int_val.to_string().into_bytes();
+                                storage.write(k.as_slice(), new_value.as_slice());
+                                RedisResponse::single(Integer(int_val as i64))
+                            }
+                            Err(error) => {
+                                RedisResponse::error(RedisCommandError::IntParse(err))
+                            }
                         }
                     }
                     None => {
