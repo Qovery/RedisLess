@@ -195,6 +195,9 @@ fn start_server<T: Storage + Send + 'static>(
         }
     };
 
+    // start garbage collection
+    thread_pool.spawn(move || do_gc(&storage));
+
     // listen incoming requests
     for stream in listener.incoming() {
         match stream {
@@ -214,6 +217,10 @@ fn start_server<T: Storage + Send + 'static>(
             break;
         }
     }
+}
+
+fn do_gc<T: Storage /*+ Send + 'static*/>(storage: &Arc<Mutex<T>>) {
+    let storage = storage.clone();
 }
 
 fn handle_tcp_stream<T: Storage + Send + 'static>(

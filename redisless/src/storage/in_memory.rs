@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use prost::bytes::BufMut;
 
@@ -27,6 +30,7 @@ impl Storage for InMemoryStorage {
         self.data_mapper.insert(key.to_vec(), meta);
         self.string_store.insert(key.to_vec(), value.to_vec());
     }
+
     fn extend(&mut self, key: &[u8], tail: &[u8]) -> u64 {
         match self.string_store.get_mut(key) {
             Some(v) => {
@@ -49,13 +53,10 @@ impl Storage for InMemoryStorage {
         }
     }
 
-    fn read(&mut self, key: &[u8]) -> Option<&[u8]> {
+    fn read(&self, key: &[u8]) -> Option<&[u8]> {
         if let Some(value) = self.data_mapper.get(key) {
             match value.is_expired() {
-                true => {
-                    self.remove(key);
-                    None
-                }
+                true => None,
                 false => Some(self.string_store.get(key).unwrap()),
             }
         } else {
@@ -64,7 +65,15 @@ impl Storage for InMemoryStorage {
     }
 
     fn meta(&self, key: &[u8]) -> Option<&RedisMeta> {
-        self.data_mapper.get(key)
+        if let Some(meta) = self.data_mapper.get(key) {
+            if meta.is_expired() {
+                None
+            } else {
+                Some(meta)
+            }
+        } else {
+            None
+        }
     }
 
     fn remove(&mut self, key: &[u8]) -> u32 {
@@ -135,13 +144,10 @@ impl Storage for InMemoryStorage {
             .insert(key.to_vec(), RedisHashMap::new(value));
     }
 
-    fn hread(&mut self, key: &[u8], field_key: &[u8]) -> Option<&[u8]> {
+    fn hread(&self, key: &[u8], field_key: &[u8]) -> Option<&[u8]> {
         if let Some(meta) = self.data_mapper.get(key) {
             match meta.is_expired() {
-                true => {
-                    self.remove(key);
-                    None
-                }
+                true => None,
                 // good to go
                 false => {
                     // will never panic since we already checked if the key existed in data_mapper
