@@ -26,6 +26,7 @@ chrono = "0.4"
 
 [dev-dependencies]
 redis = "0.20"
+rstest = "~0.9.0"
 serial_test = "0.5"
 criterion = "0.3"
 

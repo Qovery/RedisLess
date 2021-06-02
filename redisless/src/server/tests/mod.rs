@@ -4,6 +4,7 @@ use std::{thread::sleep, time::Duration};
 use crate::server::ServerState;
 use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
+mod rstest_poc;
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
