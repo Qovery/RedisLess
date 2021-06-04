@@ -43,10 +43,7 @@ fn test_incr_decr_commands() {
         Ok(_) => panic!("got valid response from incr command for key {} and value {}", "63", "foo"),
         Err(error) => {
             assert_eq!(error.kind(), redis::ErrorKind::ExtensionError);
-            match error.detail() {
-                None => panic!("returned error was None"),
-                Some(error_string) => assert_eq!(error_string, "invalid digit found in string"),
-            }
+            assert_eq!(error.to_string(), "invalid: digit found in string");
         }
     };
 
