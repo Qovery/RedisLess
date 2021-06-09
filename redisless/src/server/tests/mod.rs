@@ -4,12 +4,8 @@ use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
 use redis::{Commands, Connection, RedisWrite, ToRedisArgs};
 use rstest::*;
-use std::fmt::write;
-use std::fmt::Formatter;
-use std::fmt::Result;
-use std::fmt::{Debug, Display};
-use CommandArg::Int;
-use CommandArg::Str;
+use std::fmt::{write, Debug, Display, Formatter, Result};
+use CommandArg::{Int, Str};
 
 fn get_server_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
@@ -23,6 +19,7 @@ struct TestConnection {
     server: Server,
     con: Connection,
 }
+
 impl TestConnection {
     fn start(port: u16) -> Self {
         let (server, con) = get_server_connection(port);
@@ -30,16 +27,14 @@ impl TestConnection {
     }
     fn redis_set(&mut self, k: CommandArg, v: CommandArg) {
         let _: () = self.con.set(k, v).unwrap();
-        // match (k, v) {
-        //     (Int(k), Int(v)) | (Int(k), Str(v)) | (Str(k), Int(v)) | (Str(k), Str(v)) => {
-        //         self.con.set(k, v).unwrap()
-        //     }
-        // }
     }
-    fn redis_incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, k: K, v: V) {
+    fn redis_incr(&mut self, k: CommandArg, v: CommandArg) {
         let _: () = self.con.incr(k, v).unwrap();
     }
-    fn test_redis_get<K: ToRedisArgs, V: ToString + Debug>(&mut self, k: K, v: V) {
+    fn redis_decr(&mut self, k: CommandArg, v: CommandArg) {
+        let _: () = self.con.decr(k, v).unwrap();
+    }
+    fn test_redis_get(&mut self, k: CommandArg, v: CommandArg) {
         let res: String = self.con.get(k).unwrap();
         assert_eq!(res, v.to_string());
     }
@@ -59,6 +54,27 @@ impl TestConnection {
                         let (v, k) = (defn.pop(), defn.pop());
                         self.redis_set(k.unwrap(), v.unwrap());
                     }
+                    Str("incr") => {
+                        if defn.len() != 3 {
+                            self.halt_running(format!("wrong number of args {:?}", defn));
+                        }
+                        let (v, k) = (defn.pop(), defn.pop());
+                        self.redis_incr(k.unwrap(), v.unwrap());
+                    }
+                    Str("decr") => {
+                        if defn.len() != 3 {
+                            self.halt_running(format!("wrong number of args {:?}", defn));
+                        }
+                        let (v, k) = (defn.pop(), defn.pop());
+                        self.redis_decr(k.unwrap(), v.unwrap());
+                    }
+                    Str("test_get") => {
+                        if defn.len() != 3 {
+                            self.halt_running(format!("wrong number of args {:?}", defn));
+                        }
+                        let (v, k) = (defn.pop(), defn.pop());
+                        self.test_redis_get(k.unwrap(), v.unwrap());
+                    }
                     _ => self.halt_running(format!("unrecognized command definition {:?}", defn)),
                 },
             }
@@ -75,24 +91,26 @@ enum CommandArg<'a> {
     Str(&'a str),
     Int(i64),
 }
-struct UnitStr<'a>(&'a str);
-struct UnitInt(i64);
+struct StrData<'a>(&'a str);
+struct IntData(i64);
+
 impl<'a> CommandArg<'a> {
-    fn str(self) -> Option<UnitStr<'a>> {
+    fn str(self) -> Option<StrData<'a>> {
         if let CommandArg::Str(s) = self {
-            Some(UnitStr(s))
+            Some(StrData(s))
         } else {
             None
         }
     }
-    fn int(self) -> Option<UnitInt> {
+    fn int(self) -> Option<IntData> {
         if let CommandArg::Int(n) = self {
-            Some(UnitInt(n))
+            Some(IntData(n))
         } else {
             None
         }
     }
 }
+
 impl<'a> ToRedisArgs for CommandArg<'a> {
     fn write_redis_args<W>(&self, out: &mut W)
     where
@@ -102,10 +120,21 @@ impl<'a> ToRedisArgs for CommandArg<'a> {
             return out.write_arg_fmt(inner.0);
         }
         if let Some(inner) = self.str() {
-            out.write_arg(inner.0.as_bytes())
-        } else {
-            panic!("unimplemented CommandArg variant");
+            return out.write_arg(inner.0.as_bytes());
         }
+        panic!("CommandArg variant unimplemented trait: ToRedisArgs");
+    }
+}
+
+impl<'a> ToString for CommandArg<'a> {
+    fn to_string(&self) -> String {
+        if let Some(inner) = self.int() {
+            return inner.0.to_string();
+        }
+        if let Some(inner) = self.str() {
+            return inner.0.to_owned();
+        }
+        panic!("CommandArg variant unimplemented trait: ToString");
     }
 }
 
@@ -114,6 +143,7 @@ impl From<i64> for CommandArg<'_> {
         CommandArg::Int(n)
     }
 }
+
 impl<'a> From<&'a str> for CommandArg<'a> {
     fn from(n: &'a str) -> Self {
         CommandArg::Str(n)
@@ -169,7 +199,7 @@ macro_rules! command_args {
         command_args!["test_get", 12, "1200"],
     ]
 )]
-fn test_redis_client(#[case] port: u16, #[case] command_defns: Vec<Vec<CommandArg>>) {
+fn test_redis_client(#[case] port: u16, #[case] commands: Vec<Vec<CommandArg>>) {
     let mut t = TestConnection::start(port);
-    t.run(command_defns);
+    t.run(commands);
 }
