@@ -14,6 +14,7 @@ type Key = RedisString;
 type Value = RedisString;
 type Items = Vec<(Key, Value)>;
 type Keys = Vec<Key>;
+type Values = Vec<Value>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -31,6 +32,7 @@ pub enum Command {
     MGet(Keys),
     HSet(Key, Items),
     HGet(Key, Key),
+    RPush(Key, Values),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -198,6 +200,18 @@ impl Command {
                     let field_key = get_bytes_vec(v.get(2))?;
 
                     Ok(HGet(hash_key, field_key))
+                }
+                b"RPUSH" | b"RPush" | b"Rpush" | b"rpush" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_vec = Values::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_vec.push(value);
+                    }
+
+                    Ok(RPush(key, values_vec))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

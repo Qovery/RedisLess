@@ -114,6 +114,26 @@ pub fn run_command_and_get_response<T: Storage>(
                     None => RedisResponse::single(Nil),
                 }
             }
+            Command::RPush(key, values) => {
+                let mut len = values.len();
+                let mut storage = lock_then_release(storage);
+                if storage.contains(&key[..]) {
+                    let mut new_vals = values.to_vec();
+                    match storage.lread(&key) {
+                        Some(vals) => {
+                            let mut vals = vals.to_vec();
+                            vals.append(&mut new_vals);
+                            len = vals.len();
+                            storage.lwrite(&key, vals);
+                            RedisResponse::single(Integer(len as i64))
+                        },
+                        None => RedisResponse::single(Nil), 
+                    } 
+                } else {
+                    storage.lwrite(&key, values);
+                    RedisResponse::single(Integer(len as i64))
+                }
+            }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
                 RedisResponse::single(Integer(d as i64))

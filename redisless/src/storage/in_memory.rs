@@ -8,6 +8,7 @@ use crate::storage::Storage;
 pub struct InMemoryStorage {
     data_mapper: HashMap<RedisString, RedisMeta>,
     string_store: HashMap<RedisString, RedisString>,
+    list_store: HashMap<RedisString, Vec<RedisString>>,
     hash_store: HashMap<RedisString, RedisHashMap>,
 }
 
@@ -16,6 +17,7 @@ impl InMemoryStorage {
         Self {
             data_mapper: HashMap::new(),
             string_store: HashMap::new(),
+            list_store: HashMap::new(),
             hash_store: HashMap::new(),
         }
     }
@@ -126,6 +128,29 @@ impl Storage for InMemoryStorage {
             None => "none",
         };
         t.as_bytes()
+    }
+
+    fn lwrite(&mut self, key: &[u8], values: Vec<RedisString>) {
+        let meta = RedisMeta::new(RedisType::List, None);
+        self.data_mapper.insert(key.to_vec(), meta);
+        self.list_store.insert(key.to_vec(), values);
+    }
+
+    fn lread(&mut self, key: &[u8]) -> Option<&Vec<RedisString>> {
+        if let Some(meta) = self.data_mapper.get(key) {
+            match meta.is_expired() {
+                true => {
+                    self.remove(key);
+                    None
+                }
+                false => {
+                    let values = self.list_store.get(key);
+                    values
+                }
+            }
+        } else {
+            None
+        }
     }
 
     fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>) {
