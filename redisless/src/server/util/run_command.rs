@@ -126,9 +126,9 @@ pub fn run_command_and_get_response<T: Storage>(
                             len = vals.len();
                             storage.lwrite(&key, vals);
                             RedisResponse::single(Integer(len as i64))
-                        },
-                        None => RedisResponse::single(Nil), 
-                    } 
+                        }
+                        None => RedisResponse::single(Nil),
+                    }
                 } else {
                     storage.lwrite(&key, values);
                     RedisResponse::single(Integer(len as i64))

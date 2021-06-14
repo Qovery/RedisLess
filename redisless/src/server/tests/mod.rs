@@ -313,15 +313,17 @@ fn hset() {
 #[serial]
 fn rpush() {
     let (server, mut con) = get_redis_client_connection(3344);
-    
     let values = &["val1", "val2", "val3"][..];
-    let x = con.rpush::<&'static str, &[&str], u32>("listkey", values).unwrap();
+    let x = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values)
+        .unwrap();
     assert_eq!(x, 3);
 
     let values2 = &["val4", "val5", "val6"][..];
-    let y = con.rpush::<&'static str, &[&str], u32>("listkey", values2).unwrap();
+    let y = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values2)
+        .unwrap();
     assert_eq!(y, 6);
-    
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
