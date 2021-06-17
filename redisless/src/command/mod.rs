@@ -33,6 +33,7 @@ pub enum Command {
     HSet(Key, Items),
     HGet(Key, Key),
     RPush(Key, Values),
+    LPush(Key, Values),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -212,6 +213,18 @@ impl Command {
                     }
 
                     Ok(RPush(key, values_vec))
+                }
+                b"LPUSH" | b"LPush" | b"Lpush" | b"lpush" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_vec = Values::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_vec.push(value);
+                    }
+
+                    Ok(LPush(key, values_vec))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

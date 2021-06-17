@@ -329,6 +329,27 @@ fn rpush() {
 
 #[test]
 #[serial]
+fn lpush() {
+    let (server, mut con) = get_redis_client_connection(3348);
+    let values = &["val1", "val2", "val3"][..];
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values)
+        .unwrap();
+
+    let values2 = &["val4", "val5", "val6"][..];
+    let x = con
+        .lpush::<&'static str, &[&str], u32>("listkey", values2)
+        .unwrap();
+    assert_eq!(x, 6);
+    let y = con
+        .lpush::<&'static str, &[&str], u32>("listkey2", values2)
+        .unwrap();
+    assert_eq!(y, 3);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));
