@@ -311,6 +311,25 @@ fn hset() {
 
 #[test]
 #[serial]
+fn llen() {
+    let (server, mut con) = get_redis_client_connection(3377);
+
+    let values = &["val1", "val2", "val3", "val4"];
+    let x = con
+        .rpush::<&'static str, &[&str], u32>("lkey", values)
+        .unwrap();
+
+    let l: i64 = con.llen("lkey").unwrap();
+    assert_eq!(l, 4);
+
+    let x: i64 = con.llen("new_key").unwrap();
+    assert_eq!(x, 0);
+
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn rpush() {
     let (server, mut con) = get_redis_client_connection(3344);
     let values = &["val1", "val2", "val3"][..];
