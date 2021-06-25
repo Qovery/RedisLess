@@ -34,6 +34,7 @@ pub enum Command {
     HGet(Key, Key),
     RPush(Key, Values),
     LPush(Key, Values),
+    LLen(Key),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -225,6 +226,10 @@ impl Command {
                     }
 
                     Ok(LPush(key, values_vec))
+                }
+                b"LLEN" | b"LLen" | b"Llen" | b"llen" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(LLen(key))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

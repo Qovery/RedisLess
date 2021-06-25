@@ -115,28 +115,34 @@ pub fn run_command_and_get_response<T: Storage>(
                 }
             }
             Command::RPush(key, values) => {
-                let mut len = values.len();
                 let mut storage = lock_then_release(storage);
-                if storage.contains(&key[..]) {
-                    let mut new_vals = values.to_vec();
-                    match storage.lread(&key) {
-                        Some(vals) => {
-                            let mut vals = vals.to_vec();
-                            vals.append(&mut new_vals);
-                            len = vals.len();
-                            storage.lwrite(&key, vals);
-                            RedisResponse::single(Integer(len as i64))
-                        }
-                        None => RedisResponse::single(Nil),
+                let keytype = storage.type_of(&key);
+                if keytype != "list".as_bytes() && keytype != "none".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut len = values.len();
+                let mut new_vals = values.to_vec();
+                match storage.lread(&key) {
+                    Some(vals) => {
+                        let mut vals = vals.to_vec();
+                        vals.append(&mut new_vals);
+                        len = vals.len();
+                        storage.lwrite(&key, vals);
+                        RedisResponse::single(Integer(len as i64))
                     }
-                } else {
-                    storage.lwrite(&key, values);
-                    RedisResponse::single(Integer(len as i64))
+                    None => {
+                        storage.lwrite(&key, new_vals);
+                        RedisResponse::single(Integer(len as i64))
+                    }
                 }
             }
             Command::LPush(key, values) => {
-                let mut len = values.len();
                 let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype != "list".as_bytes() && keytype != "none".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut len = values.len();
                 let mut values: Vec<RedisString> = values.to_vec().into_iter().rev().collect();
                 match storage.lread(&key) {
                     Some(old_vals) => {
@@ -150,6 +156,17 @@ pub fn run_command_and_get_response<T: Storage>(
                         storage.lwrite(&key, values);
                         RedisResponse::single(Integer(len as i64))
                     }
+                }
+            }
+            Command::LLen(key) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype != "list".as_bytes() && keytype != "none".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                match storage.lread(&key) {
+                    Some(vals) => RedisResponse::single(Integer(vals.len() as i64)),
+                    None => RedisResponse::single(Integer(0)),
                 }
             }
             Command::Del(k) => {

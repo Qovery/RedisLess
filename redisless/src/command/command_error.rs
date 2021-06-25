@@ -22,6 +22,8 @@ pub enum RedisCommandError {
     ProtocolParse(RedisError),
     InvalidCommand,
     CommandNotFound,
+    // Wrong type operation against a key
+    WrongTypeOperation,
 }
 
 impl RedisCommandError {
@@ -45,6 +47,10 @@ impl Display for RedisCommandError {
             Self::ProtocolParse(err) => write!(f, "{}", err),
             Self::InvalidCommand => write!(f, "invalid command"),
             Self::CommandNotFound => write!(f, "command not found"),
+            Self::WrongTypeOperation => write!(
+                f,
+                "WRONGTYPE Operation against a key holding the wrong kind of value"
+            ),
         }
     }
 }
