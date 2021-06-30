@@ -169,6 +169,48 @@ pub fn run_command_and_get_response<T: Storage>(
                     None => RedisResponse::single(Integer(0)),
                 }
             }
+            Command::RPushx(key, values) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Integer(0));
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut new_vals = values.to_vec();
+                match storage.lread(&key) {
+                    Some(vals) => {
+                        let mut vals = vals.to_vec();
+                        vals.append(&mut new_vals);
+                        let len = vals.len();
+                        storage.lwrite(&key, vals);
+                        RedisResponse::single(Integer(len as i64))
+                    }
+                    None => RedisResponse::single(Integer(0)),
+                }
+            }
+            Command::LPushx(key, values) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Integer(0));
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut values: Vec<RedisString> = values.to_vec().into_iter().rev().collect();
+                match storage.lread(&key) {
+                    Some(old_vals) => {
+                        let mut old_vals = old_vals.to_vec();
+                        values.append(&mut old_vals);
+                        let len = values.len();
+                        storage.lwrite(&key, values);
+                        RedisResponse::single(Integer(len as i64))
+                    }
+                    None => RedisResponse::single(Integer(0)),
+                }
+            }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
                 RedisResponse::single(Integer(d as i64))
