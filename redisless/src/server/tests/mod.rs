@@ -400,6 +400,24 @@ fn rpushx_lpushx() {
 
 #[test]
 #[serial]
+fn rpop_lpop() {
+    let (server, mut con) = get_redis_client_connection(3354);
+    let values = &["val1", "val2"][..];
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values)
+        .unwrap();
+
+    let x: String = con.rpop("listkey").unwrap();
+    assert_eq!(x, "val2");
+    let y: String = con.lpop("listkey").unwrap();
+    assert_eq!(y, "val1");
+    let z: bool = con.exists("listkey").unwrap();
+    assert_eq!(z, false);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));

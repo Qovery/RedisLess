@@ -37,6 +37,8 @@ pub enum Command {
     LLen(Key),
     RPushx(Key, Values),
     LPushx(Key, Values),
+    RPop(Key),
+    LPop(Key),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -254,6 +256,14 @@ impl Command {
                         values_vec.push(value);
                     }
                     Ok(LPushx(key, values_vec))
+                }
+                b"RPOP" | b"RPop" | b"Rpop" | b"rpop" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(RPop(key))
+                }
+                b"LPOP" | b"LPop" | b"Lpop" | b"lpop" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(LPop(key))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

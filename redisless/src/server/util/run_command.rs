@@ -211,6 +211,56 @@ pub fn run_command_and_get_response<T: Storage>(
                     None => RedisResponse::single(Integer(0)),
                 }
             }
+            Command::RPop(key) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Nil);
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                match storage.lread(&key) {
+                    Some(values) => {
+                        let mut values = values.to_vec();
+                        match values.pop() {
+                            Some(value) => {
+                                if values.is_empty() {
+                                    storage.remove(&key);
+                                } else {
+                                    storage.lwrite(&key, values);
+                                }
+                                RedisResponse::single(BulkString(value))
+                            }
+                            None => RedisResponse::single(Nil),
+                        }
+                    }
+                    None => RedisResponse::single(Nil),
+                }
+            }
+            Command::LPop(key) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Nil);
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                match storage.lread(&key) {
+                    Some(values) => {
+                        let mut values = values.to_vec();
+                        let value = values.remove(0);
+                        if values.is_empty() {
+                            storage.remove(&key);
+                        } else {
+                            storage.lwrite(&key, values);
+                        }
+                        RedisResponse::single(BulkString(value))
+                    }
+                    None => RedisResponse::single(Nil),
+                }
+            }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
                 RedisResponse::single(Integer(d as i64))
