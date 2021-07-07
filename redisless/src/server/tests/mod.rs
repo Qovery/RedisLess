@@ -1,10 +1,69 @@
-use redis::{Commands, Connection, RedisResult};
+use redis::{Commands, Connection, RedisResult, ToRedisArgs};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
 use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
 
+struct TestClient {
+    server: Server,
+    con: Connection,
+}
+impl TestClient {
+    fn connect(port: u16) -> Self {
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+
+        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+
+        TestClient {
+            server,
+            con: redis_client.get_connection().unwrap(),
+        }
+    }
+
+    fn stop(&mut self) {
+        assert_eq!(self.server.stop(), Some(ServerState::Stopped));
+    }
+
+    fn get<K: ToRedisArgs>(&mut self, key: K) -> String {
+        self.con.get(key).unwrap()
+    }
+
+    fn set<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) {
+        self.con.set(key, value).unwrap()
+    }
+
+    fn incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
+        self.con.incr(key, delta).unwrap()
+    }
+
+    fn decr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
+        self.con.decr(key, delta).unwrap()
+    }
+}
+#[test]
+fn test_client_incr_decr() {
+    let mut t = TestClient::connect(1024);
+
+    // Arrange
+    t.set("user:5987:balance", 2500);
+    t.set("0", "1945");
+    t.set("n", "654321");
+    t.set("63", "89");
+    // Act
+    t.incr("user:5987:balance", 600);
+    t.incr("0", -2021);
+    t.decr("n", 1);
+    t.decr("63", -10);
+    // Assert
+    assert_eq!(t.get("user:5987:balance"), "3100");
+    assert_eq!(t.get("0"), "-76");
+    assert_eq!(t.get("n"), "654320");
+    assert_eq!(t.get("63"), "99");
+
+    t.stop();
+}
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
