@@ -9,29 +9,30 @@ struct TestClient {
     server: Server,
     con: Connection,
 }
+
 impl TestClient {
     fn connect(port: u16) -> Self {
         let server = Server::new(InMemoryStorage::new(), port);
         assert_eq!(server.start(), Some(ServerState::Started));
 
-        let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+        let con = redis::Client::open(format!("redis://127.0.0.1:{}/", port))
+            .unwrap()
+            .get_connection()
+            .unwrap();
 
-        TestClient {
-            server,
-            con: redis_client.get_connection().unwrap(),
-        }
+        TestClient { server, con }
     }
 
     fn stop(&mut self) {
         assert_eq!(self.server.stop(), Some(ServerState::Stopped));
     }
 
-    fn get<K: ToRedisArgs>(&mut self, key: K) -> String {
-        self.con.get(key).unwrap()
-    }
-
     fn set<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) {
         self.con.set(key, value).unwrap()
+    }
+
+    fn get<K: ToRedisArgs>(&mut self, key: K) -> String {
+        self.con.get(key).unwrap()
     }
 
     fn incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
@@ -41,29 +42,76 @@ impl TestClient {
     fn decr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
         self.con.decr(key, delta).unwrap()
     }
+
+    fn exists<K: ToRedisArgs>(&mut self, key: K) -> bool {
+        self.con.exists(key).unwrap()
+    }
+
+    fn ttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
+        self.con.ttl(key).unwrap()
+    }
+
+    fn pttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
+        self.con.pttl(key).unwrap()
+    }
 }
+
 #[test]
-fn test_client_incr_decr() {
+fn test_client_incr_by_integer() {
     let mut t = TestClient::connect(1024);
 
     // Arrange
-    t.set("user:5987:balance", 2500);
-    t.set("0", "1945");
-    t.set("n", "654321");
-    t.set("63", "89");
+    t.set("integer +", 2500);
+    t.set("integer -", "17");
     // Act
-    t.incr("user:5987:balance", 600);
-    t.incr("0", -2021);
-    t.decr("n", 1);
-    t.decr("63", -10);
+    t.incr("integer +", 600);
+    t.incr("integer -", -30);
     // Assert
-    assert_eq!(t.get("user:5987:balance"), "3100");
-    assert_eq!(t.get("0"), "-76");
-    assert_eq!(t.get("n"), "654320");
-    assert_eq!(t.get("63"), "99");
+    assert_eq!(t.get("integer +"), "3100");
+    assert_eq!(t.get("integer -"), "-13");
 
     t.stop();
 }
+
+#[test]
+fn test_client_decr_by_integer() {
+    let mut t = TestClient::connect(1025);
+
+    // Arrange
+    t.set("integer +", 120);
+    t.set("integer -", "24");
+    // Act
+    t.decr("integer +", 70);
+    t.decr("integer -", -6);
+    // Assert
+    assert_eq!(t.get("integer +"), "50");
+    assert_eq!(t.get("integer -"), "30");
+
+    t.stop();
+}
+
+#[test]
+fn test_client_ttl_pttl_error_cases() {
+    let mut t = TestClient::connect(1026);
+
+    // Arrange
+    t.set("timeout not set", 3600);
+
+    // Assert
+    assert_eq!(t.exists("timeout not set"), true);
+    assert_eq!(t.ttl("timeout not set"), -1);
+    assert_eq!(t.pttl("timeout not set"), -1);
+
+    assert_eq!(t.exists("non-existent"), false);
+    assert_eq!(t.ttl("non-existent"), -2);
+    assert_eq!(t.pttl("non-existent"), -2);
+
+    t.stop();
+}
+
+// expire_pexpire
+// setex_psetex
+
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
