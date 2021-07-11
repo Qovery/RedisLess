@@ -30,45 +30,38 @@ impl TestClient {
     fn set<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) {
         self.con.set(key, value).unwrap()
     }
-
     fn get<K: ToRedisArgs>(&mut self, key: K) -> Option<String> {
         self.con.get(key).ok()
     }
-
     fn incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
         self.con.incr(key, delta).unwrap()
     }
-
     fn decr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
         self.con.decr(key, delta).unwrap()
     }
-
     fn exists<K: ToRedisArgs>(&mut self, key: K) -> bool {
         self.con.exists(key).unwrap()
     }
-
     fn ttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
         self.con.ttl(key).unwrap()
     }
-
     fn pttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
         self.con.pttl(key).unwrap()
     }
-
     fn expire<K: ToRedisArgs>(&mut self, key: K, seconds: usize) -> u8 {
         self.con.expire(key, seconds).unwrap()
     }
-
     fn pexpire<K: ToRedisArgs>(&mut self, key: K, ms: usize) -> u8 {
         self.con.pexpire(key, ms).unwrap()
     }
-
     fn set_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, seconds: usize) {
         self.con.set_ex(key, value, seconds).unwrap()
     }
-
     fn pset_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, milliseconds: usize) {
         self.con.pset_ex(key, value, milliseconds).unwrap()
+    }
+    fn getset<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) -> Option<String> {
+        self.con.getset(key, value).ok()
     }
 }
 
@@ -199,7 +192,29 @@ fn test_client_setex_psetex() {
     t.stop();
 }
 
-// setex_psetex
+#[test]
+fn test_client_getset() {
+    let mut t = TestClient::connect(1029);
+
+    // Arrange
+    t.set("queue of one person", "James Robert");
+
+    // Act
+    let ret_getset1 = t
+        .getset("queue of one person", "Patricia Jennifer")
+        .unwrap();
+    let ret_getset2 = t
+        .getset("queue of one person", "Barbara Susan Jessica")
+        .unwrap();
+    let ret_get = t.get("queue of one person").unwrap();
+
+    // Assert
+    assert_eq!(ret_getset1, "James Robert");
+    assert_eq!(ret_getset2, "Patricia Jennifer");
+    assert_eq!(ret_get, "Barbara Susan Jessica");
+
+    t.stop();
+}
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
