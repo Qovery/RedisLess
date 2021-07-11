@@ -31,8 +31,8 @@ impl TestClient {
         self.con.set(key, value).unwrap()
     }
 
-    fn get<K: ToRedisArgs>(&mut self, key: K) -> String {
-        self.con.get(key).unwrap()
+    fn get<K: ToRedisArgs>(&mut self, key: K) -> Option<String> {
+        self.con.get(key).ok()
     }
 
     fn incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
@@ -54,6 +54,22 @@ impl TestClient {
     fn pttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
         self.con.pttl(key).unwrap()
     }
+
+    fn expire<K: ToRedisArgs>(&mut self, key: K, seconds: usize) -> u8 {
+        self.con.expire(key, seconds).unwrap()
+    }
+
+    fn pexpire<K: ToRedisArgs>(&mut self, key: K, ms: usize) -> u8 {
+        self.con.pexpire(key, ms).unwrap()
+    }
+
+    fn set_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, seconds: usize) {
+        self.con.set_ex(key, value, seconds).unwrap()
+    }
+
+    fn pset_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, milliseconds: usize) {
+        self.con.pset_ex(key, value, milliseconds).unwrap()
+    }
 }
 
 #[test]
@@ -67,8 +83,8 @@ fn test_client_incr_by_integer() {
     t.incr("integer +", 600);
     t.incr("integer -", -30);
     // Assert
-    assert_eq!(t.get("integer +"), "3100");
-    assert_eq!(t.get("integer -"), "-13");
+    assert_eq!(t.get("integer +"), Some("3100".to_string()));
+    assert_eq!(t.get("integer -"), Some("-13".to_string()));
 
     t.stop();
 }
@@ -84,8 +100,8 @@ fn test_client_decr_by_integer() {
     t.decr("integer +", 70);
     t.decr("integer -", -6);
     // Assert
-    assert_eq!(t.get("integer +"), "50");
-    assert_eq!(t.get("integer -"), "30");
+    assert_eq!(t.get("integer +"), Some("50".to_string()));
+    assert_eq!(t.get("integer -"), Some("30".to_string()));
 
     t.stop();
 }
@@ -95,21 +111,94 @@ fn test_client_ttl_pttl_error_cases() {
     let mut t = TestClient::connect(1026);
 
     // Arrange
-    t.set("timeout not set", 3600);
+    t.set("key exists but timeout is not set", 3600);
+
+    // Act
+    let ret_timeout_not_set = (
+        t.ttl("key exists but timeout is not set"),
+        t.pttl("key exists but timeout is not set"),
+    );
+    let ret_non_existent = (
+        t.ttl("non-existent key is an error"),
+        t.pttl("non-existent key is an error"),
+    );
 
     // Assert
-    assert_eq!(t.exists("timeout not set"), true);
-    assert_eq!(t.ttl("timeout not set"), -1);
-    assert_eq!(t.pttl("timeout not set"), -1);
+    assert_eq!(t.exists("key exists but timeout is not set"), true);
+    assert_eq!(ret_timeout_not_set, (-1, -1));
 
-    assert_eq!(t.exists("non-existent"), false);
-    assert_eq!(t.ttl("non-existent"), -2);
-    assert_eq!(t.pttl("non-existent"), -2);
+    assert_eq!(t.exists("non-existent key is an error"), false);
+    assert_eq!(ret_non_existent, (-2, -2));
 
     t.stop();
 }
 
-// expire_pexpire
+#[test]
+fn test_client_expire_pexpire() {
+    let mut t = TestClient::connect(1027);
+
+    // Arrange
+    t.set("has timeout", "I will fade");
+
+    // Act
+    let dur_ms = 900_usize;
+    let ret_has_timeout = (
+        t.expire("has timeout", 86400_usize),
+        t.pexpire("has timeout", dur_ms),
+    );
+    let ret_non_existent = (
+        t.expire("non-existent", 78_usize),
+        t.pexpire("non-existent", 12_usize),
+    );
+
+    let ret_still_alive = t.get("has timeout");
+    sleep(Duration::from_millis(dur_ms as u64));
+    let ret_expired_after_sleep = t.get("has timeout");
+
+    // Assert
+    assert_eq!(ret_has_timeout, (1, 1));
+    assert_eq!(ret_non_existent, (0, 0));
+
+    assert_eq!(ret_still_alive, Some("I will fade".to_string()));
+    assert_eq!(ret_expired_after_sleep, None);
+
+    t.stop();
+}
+
+#[test]
+fn test_client_setex_psetex() {
+    let mut t = TestClient::connect(1028);
+
+    // Arrange
+    let ret_didnt_exist = (
+        !t.exists("a bird in the hand is worth"),
+        !t.exists("the devil's playground"),
+    );
+
+    // Act
+    let dur_ms = 1000_usize;
+    t.set_ex("a bird in the hand is worth", "two in the bush", 1_usize);
+    t.pset_ex("the devil's playground", "an idle mind", dur_ms);
+
+    let ret_still_alive = (
+        t.get("a bird in the hand is worth").unwrap(),
+        t.get("the devil's playground").unwrap(),
+    );
+    sleep(Duration::from_millis(dur_ms as u64));
+    let ret_expired_after_sleep = (
+        t.get("a bird in the hand is worth"),
+        t.get("the devil's playground"),
+    );
+
+    // Assert
+    assert_eq!(ret_didnt_exist, (true, true));
+    assert_eq!(ret_still_alive.0, "two in the bush");
+    assert_eq!(ret_still_alive.1, "an idle mind");
+    assert_eq!(ret_expired_after_sleep, (None, None));
+
+    t.stop();
+}
+
 // setex_psetex
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
