@@ -10,6 +10,12 @@ struct TestClient {
     con: Connection,
 }
 
+impl Drop for TestClient {
+    fn drop(&mut self) {
+        assert_eq!(self.server.stop(), Some(ServerState::Stopped));
+    }
+}
+
 impl TestClient {
     fn connect(port: u16) -> Self {
         let server = Server::new(InMemoryStorage::new(), port);
@@ -21,10 +27,6 @@ impl TestClient {
             .unwrap();
 
         TestClient { server, con }
-    }
-
-    fn stop(&mut self) {
-        assert_eq!(self.server.stop(), Some(ServerState::Stopped));
     }
 
     fn set<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) {
@@ -78,8 +80,6 @@ fn test_client_incr_by_integer() {
     // Assert
     assert_eq!(t.get("integer +"), Some("3100".to_string()));
     assert_eq!(t.get("integer -"), Some("-13".to_string()));
-
-    t.stop();
 }
 
 #[test]
@@ -95,8 +95,6 @@ fn test_client_decr_by_integer() {
     // Assert
     assert_eq!(t.get("integer +"), Some("50".to_string()));
     assert_eq!(t.get("integer -"), Some("30".to_string()));
-
-    t.stop();
 }
 
 #[test]
@@ -122,8 +120,6 @@ fn test_client_ttl_pttl_error_cases() {
 
     assert_eq!(t.exists("non-existent key is an error"), false);
     assert_eq!(ret_non_existent, (-2, -2));
-
-    t.stop();
 }
 
 #[test]
@@ -154,8 +150,6 @@ fn test_client_expire_pexpire() {
 
     assert_eq!(ret_still_alive, Some("I will fade".to_string()));
     assert_eq!(ret_expired_after_sleep, None);
-
-    t.stop();
 }
 
 #[test]
@@ -188,8 +182,6 @@ fn test_client_setex_psetex() {
     assert_eq!(ret_still_alive.0, "two in the bush");
     assert_eq!(ret_still_alive.1, "an idle mind");
     assert_eq!(ret_expired_after_sleep, (None, None));
-
-    t.stop();
 }
 
 #[test]
@@ -212,8 +204,6 @@ fn test_client_getset() {
     assert_eq!(ret_getset1, "James Robert");
     assert_eq!(ret_getset2, "Patricia Jennifer");
     assert_eq!(ret_get, "Barbara Susan Jessica");
-
-    t.stop();
 }
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
