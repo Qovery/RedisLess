@@ -65,6 +65,9 @@ impl TestClient {
     fn getset<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) -> Option<String> {
         self.con.getset(key, value).ok()
     }
+    fn del<K: ToRedisArgs>(&mut self, key: K) {
+        self.con.del(key).unwrap()
+    }
 }
 
 #[test]
@@ -78,8 +81,8 @@ fn test_client_incr_by_integer() {
     t.incr("integer +", 600);
     t.incr("integer -", -30);
     // Assert
-    assert_eq!(t.get("integer +"), Some("3100".to_string()));
-    assert_eq!(t.get("integer -"), Some("-13".to_string()));
+    assert_eq!(t.get("integer +").unwrap(), "3100");
+    assert_eq!(t.get("integer -").unwrap(), "-13");
 }
 
 #[test]
@@ -93,8 +96,8 @@ fn test_client_decr_by_integer() {
     t.decr("integer +", 70);
     t.decr("integer -", -6);
     // Assert
-    assert_eq!(t.get("integer +"), Some("50".to_string()));
-    assert_eq!(t.get("integer -"), Some("30".to_string()));
+    assert_eq!(t.get("integer +").unwrap(), "50");
+    assert_eq!(t.get("integer -").unwrap(), "30");
 }
 
 #[test]
@@ -204,6 +207,29 @@ fn test_client_getset() {
     assert_eq!(ret_getset1, "James Robert");
     assert_eq!(ret_getset2, "Patricia Jennifer");
     assert_eq!(ret_get, "Barbara Susan Jessica");
+}
+
+#[test]
+fn test_client_dbsize() {
+    let mut t = TestClient::connect(1030);
+
+    // Arrange-Act
+    let ret_dbsize1: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.set("1", "january");
+    let ret_dbsize2: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.set("2", "february");
+    let ret_dbsize3: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.del("2");
+    let ret_dbsize4: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    // Assert
+    assert_eq!(ret_dbsize1, 0);
+    assert_eq!(ret_dbsize2, 1);
+    assert_eq!(ret_dbsize3, 2);
+    assert_eq!(ret_dbsize4, 1);
 }
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
