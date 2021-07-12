@@ -261,6 +261,78 @@ pub fn run_command_and_get_response<T: Storage>(
                     None => RedisResponse::single(Nil),
                 }
             }
+            Command::LIndex(key, index) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Nil);
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut index = index;
+                let values = storage.lread(&key).unwrap().to_vec();
+                let len = values.len() as i64;
+                if index < 0 {
+                    index = index + len;
+                }
+                if index < 0 || index >= len {
+                    return RedisResponse::single(Nil);
+                }
+                match values.get(index as usize) {
+                    Some(value) => RedisResponse::single(SimpleString(value.to_vec())),
+                    None => RedisResponse::single(Nil),
+                }
+            }
+            Command::LSet(key, index, value) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::NoSuchKey);
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut index = index;
+                let mut values = storage.lread(&key).unwrap().to_vec();
+                let len = values.len() as i64;
+                if index < 0 {
+                    index = index + len;
+                }
+                if index < 0 || index >= len {
+                    return RedisResponse::error(RedisCommandError::IndexOutOfRange);
+                }
+                let _ = std::mem::replace(&mut values[index as usize], value);
+                storage.lwrite(&key, values);
+                RedisResponse::okay()
+            }
+            Command::LInsert(key, place, pivot, value) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Integer(0));
+                }
+                if keytype != "list".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                if place != b"BEFORE" && place != b"AFTER" {
+                    return RedisResponse::error(RedisCommandError::SyntaxErr);
+                }
+                let mut values = storage.lread(&key).unwrap().to_vec();
+                let index = values.iter().position(|v| v == &pivot);
+                match index {
+                    Some(mut i) => {
+                        if place == b"AFTER" {
+                            i = i + 1;
+                        }
+                        values.insert(i, value);
+                        let len = values.len();
+                        storage.lwrite(&key, values);
+                        RedisResponse::single(Integer(len as i64))
+                    }
+                    None => RedisResponse::single(Integer(-1)),
+                }
+            }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
                 RedisResponse::single(Integer(d as i64))

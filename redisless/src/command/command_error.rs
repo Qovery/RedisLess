@@ -24,6 +24,9 @@ pub enum RedisCommandError {
     CommandNotFound,
     // Wrong type operation against a key
     WrongTypeOperation,
+    NoSuchKey,
+    IndexOutOfRange,
+    SyntaxErr,
 }
 
 impl RedisCommandError {
@@ -51,6 +54,9 @@ impl Display for RedisCommandError {
                 f,
                 "WRONGTYPE Operation against a key holding the wrong kind of value"
             ),
+            Self::NoSuchKey => write!(f, "no such key"),
+            Self::IndexOutOfRange => write!(f, "index out of range"),
+            Self::SyntaxErr => write!(f, "systax error"),
         }
     }
 }

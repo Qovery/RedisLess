@@ -39,6 +39,9 @@ pub enum Command {
     LPushx(Key, Values),
     RPop(Key),
     LPop(Key),
+    LIndex(Key, i64),
+    LSet(Key, i64, Value),
+    LInsert(Key, RedisString, RedisString, Value),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -264,6 +267,24 @@ impl Command {
                 b"LPOP" | b"LPop" | b"Lpop" | b"lpop" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(LPop(key))
+                }
+                b"LINDEX" | b"LIndex" | b"Lindex" | b"lindex" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let index = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
+                    Ok(LIndex(key, index))
+                }
+                b"LSET" | b"LSet" | b"Lset" | b"lset" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let index = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
+                    let value = get_bytes_vec(v.get(3))?;
+                    Ok(LSet(key, index, value))
+                }
+                b"LINSERT" | b"LInsert" | b"Linsert" | b"linsert" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let place = get_bytes_vec(v.get(2))?;
+                    let pivot = get_bytes_vec(v.get(3))?;
+                    let value = get_bytes_vec(v.get(4))?;
+                    Ok(LInsert(key, place, pivot, value))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
