@@ -411,6 +411,14 @@ fn test_client_append() {
     assert_eq!(ret_get2, "hello");
 }
 
+fn get_redis_client_connection(port: u16) -> (Server, Connection) {
+    let server = Server::new(InMemoryStorage::new(), port);
+    assert_eq!(server.start(), Some(ServerState::Started));
+
+    let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
+    (server, redis_client.get_connection().unwrap())
+}
+
 #[test]
 #[serial]
 fn rpushx_lpushx() {
