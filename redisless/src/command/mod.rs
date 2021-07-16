@@ -35,6 +35,10 @@ pub enum Command {
     RPush(Key, Values),
     LPush(Key, Values),
     LLen(Key),
+    RPushx(Key, Values),
+    LPushx(Key, Values),
+    RPop(Key),
+    LPop(Key),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -230,6 +234,36 @@ impl Command {
                 b"LLEN" | b"LLen" | b"Llen" | b"llen" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(LLen(key))
+                }
+                b"RPUSHX" | b"RPushx" | b"Rpushx" | b"rpushx" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_vec = Values::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_vec.push(value);
+                    }
+                    Ok(RPushx(key, values_vec))
+                }
+                b"LPUSHX" | b"LPushx" | b"Lpushx" | b"lpushx" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_vec = Values::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_vec.push(value);
+                    }
+                    Ok(LPushx(key, values_vec))
+                }
+                b"RPOP" | b"RPop" | b"Rpop" | b"rpop" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(RPop(key))
+                }
+                b"LPOP" | b"LPop" | b"Lpop" | b"lpop" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(LPop(key))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;

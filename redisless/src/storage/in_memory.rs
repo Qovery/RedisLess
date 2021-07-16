@@ -81,7 +81,10 @@ impl Storage for InMemoryStorage {
                     Some(_) => 1,
                     None => 0,
                 },
-                List => unimplemented!(),
+                List => match self.list_store.remove(&key) {
+                    Some(_) => 1,
+                    None => 0,
+                },
                 Set => unimplemented!(),
             },
             None => 0,
