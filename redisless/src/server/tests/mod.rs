@@ -418,6 +418,31 @@ fn rpop_lpop() {
 
 #[test]
 #[serial]
+fn lindex_lset_linsert() {
+    let (server, mut con) = get_redis_client_connection(3355);
+    let values = &["val1", "val2", "val3"][..];
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values)
+        .unwrap();
+
+    let x: String = con.lindex("listkey", 1).unwrap();
+    assert_eq!(x, "val2");
+    let y: String = con.lindex("listkey", -3).unwrap();
+    assert_eq!(y, "val1");
+
+    let _: () = con.lset("listkey", 0, "val0").unwrap();
+
+    let a: i64 = con.linsert_before("listkey", "val2", "val1").unwrap();
+    assert_eq!(a, 4);
+    let b: i64 = con.linsert_after("listkey", "val3", "val4").unwrap();
+    assert_eq!(b, 5);
+    let c: i64 = con.linsert_before("listkey", "val10", "val9").unwrap();
+    assert_eq!(c, -1);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));
