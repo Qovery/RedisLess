@@ -443,6 +443,43 @@ fn lindex_lset_linsert() {
 
 #[test]
 #[serial]
+fn ltrim_lrem_rpoplpush() {
+    let (server, mut con) = get_redis_client_connection(3356);
+    let values = &["val1", "val2", "val3", "val4", "val5", "val6"][..];
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("listkey", values)
+        .unwrap();
+    let _: () = con.ltrim("listkey", 1, 3).unwrap();
+
+    let nums = &[1, 2, 1, 1, 1, 2, 1, 1][..];
+    let _ = con
+        .rpush::<&'static str, &[u64], u32>("numkey", nums)
+        .unwrap();
+    let x: i64 = con.lrem("numkey", -3, 1).unwrap();
+    assert_eq!(x, 3);
+    let y: i64 = con.lrem("numkey", 2, 2).unwrap();
+    assert_eq!(y, 2);
+
+    let src_vals = &["val1", "val2"];
+    let dest_vals = &["val3", "val4"];
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("src", src_vals)
+        .unwrap();
+    let _ = con
+        .rpush::<&'static str, &[&str], u32>("dest", dest_vals)
+        .unwrap();
+    let a: String = con.rpoplpush("src", "dest").unwrap();
+    assert_eq!(a, "val2");
+    let b: String = con.rpoplpush("src", "dest").unwrap();
+    assert_eq!(b, "val1");
+    let c: bool = con.exists("src").unwrap();
+    assert_eq!(c, false);
+
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));

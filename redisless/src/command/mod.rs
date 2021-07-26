@@ -42,6 +42,9 @@ pub enum Command {
     LIndex(Key, i64),
     LSet(Key, i64, Value),
     LInsert(Key, RedisString, RedisString, Value),
+    LTrim(Key, i64, i64),
+    LRem(Key, i64, Value),
+    RPopLPush(Key, Key),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -285,6 +288,23 @@ impl Command {
                     let pivot = get_bytes_vec(v.get(3))?;
                     let value = get_bytes_vec(v.get(4))?;
                     Ok(LInsert(key, place, pivot, value))
+                }
+                b"LTRIM" | b"LTrim" | b"Ltrim" | b"ltrim" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let start = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
+                    let end = get_bytes_vec(v.get(3)).and_then(parse_variation)?;
+                    Ok(LTrim(key, start, end))
+                }
+                b"LREM" | b"LRem" | b"Lrem" | b"lrem" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let count = get_bytes_vec(v.get(2)).and_then(parse_variation)?;
+                    let value = get_bytes_vec(v.get(3))?;
+                    Ok(LRem(key, count, value))
+                }
+                b"RPOPLPUSH" | b"RPopLPush" | b"RpopLpush" | b"rpoplpush" => {
+                    let src = get_bytes_vec(v.get(1))?;
+                    let dest = get_bytes_vec(v.get(2))?;
+                    Ok(RPopLPush(src, dest))
                 }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
