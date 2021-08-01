@@ -4,6 +4,8 @@ mod tests;
 pub mod command_error;
 mod util;
 
+use std::collections::HashSet;
+
 use crate::protocol::Resp;
 use crate::storage::models::Expiry;
 use command_error::RedisCommandError;
@@ -15,6 +17,7 @@ type Value = RedisString;
 type Items = Vec<(Key, Value)>;
 type Keys = Vec<Key>;
 type Values = Vec<Value>;
+type SetValues = HashSet<Value>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -45,6 +48,9 @@ pub enum Command {
     LTrim(Key, i64, i64),
     LRem(Key, i64, Value),
     RPopLPush(Key, Key),
+    SAdd(Key, SetValues),
+    SCard(Key),
+    SRem(Key, SetValues),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -306,6 +312,33 @@ impl Command {
                     let dest = get_bytes_vec(v.get(2))?;
                     Ok(RPopLPush(src, dest))
                 }
+                b"SADD" | b"SAdd" | b"Sadd" | b"sadd" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_set = SetValues::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_set.insert(value);
+                    }
+                    Ok(SAdd(key, values_set))
+                }
+                b"SCARD" | b"SCard" | b"Scard" | b"scard" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    Ok(SCard(key))
+                }
+                b"SREM" | b"SRem" | b"Srem" | b"srem" => {
+                    let key = get_bytes_vec(v.get(1))?;
+                    let values = &v[2..];
+
+                    let mut values_set = SetValues::with_capacity(values.len());
+                    for value in values {
+                        let value = get_bytes_vec(Some(value))?;
+                        values_set.insert(value);
+                    }
+                    Ok(SRem(key, values_set))
+                }
+
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Del(key))

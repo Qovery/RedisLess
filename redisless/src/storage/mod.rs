@@ -4,7 +4,7 @@ mod tests;
 pub mod in_memory;
 pub mod models;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use models::expiry::Expiry;
 use models::RedisString;
@@ -21,6 +21,8 @@ pub trait Storage {
     fn type_of(&mut self, key: &[u8]) -> &[u8];
     fn lwrite(&mut self, key: &[u8], values: Vec<RedisString>);
     fn lread(&mut self, key: &[u8]) -> Option<&Vec<RedisString>>;
+    fn swrite(&mut self, key: &[u8], values: HashSet<RedisString>);
+    fn sread(&mut self, key: &[u8]) -> Option<&HashSet<RedisString>>;
     fn hwrite(&mut self, key: &[u8], value: HashMap<RedisString, RedisString>);
     fn hread(&mut self, key: &[u8], field_key: &[u8]) -> Option<&[u8]>;
     fn size(&self) -> u64;
