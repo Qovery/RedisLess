@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use prost::bytes::BufMut;
 
@@ -9,6 +9,7 @@ pub struct InMemoryStorage {
     data_mapper: HashMap<RedisString, RedisMeta>,
     string_store: HashMap<RedisString, RedisString>,
     list_store: HashMap<RedisString, Vec<RedisString>>,
+    set_store: HashMap<RedisString, HashSet<RedisString>>,
     hash_store: HashMap<RedisString, RedisHashMap>,
 }
 
@@ -18,6 +19,7 @@ impl InMemoryStorage {
             data_mapper: HashMap::new(),
             string_store: HashMap::new(),
             list_store: HashMap::new(),
+            set_store: HashMap::new(),
             hash_store: HashMap::new(),
         }
     }
@@ -148,6 +150,29 @@ impl Storage for InMemoryStorage {
                 }
                 false => {
                     let values = self.list_store.get(key);
+                    values
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn swrite(&mut self, key: &[u8], values: HashSet<RedisString>) {
+        let meta = RedisMeta::new(RedisType::Set, None);
+        self.data_mapper.insert(key.to_vec(), meta);
+        self.set_store.insert(key.to_vec(), values);
+    }
+
+    fn sread(&mut self, key: &[u8]) -> Option<&HashSet<RedisString>> {
+        if let Some(meta) = self.data_mapper.get(key) {
+            match meta.is_expired() {
+                true => {
+                    self.remove(key);
+                    None
+                }
+                false => {
+                    let values = self.set_store.get(key);
                     values
                 }
             }

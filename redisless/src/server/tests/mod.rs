@@ -480,6 +480,27 @@ fn ltrim_lrem_rpoplpush() {
 
 #[test]
 #[serial]
+fn sadd_scard_srem() {
+    let (server, mut con) = get_redis_client_connection(3357);
+
+    let values = &["val1", "val2", "val3", "val1"][..];
+    let x: i64 = con.sadd("setkey", values).unwrap();
+    assert_eq!(x, 3);
+    let values2 = &["val3", "val4", "val5"][..];
+    let y: i64 = con.sadd("setkey", values2).unwrap();
+    assert_eq!(y, 2);
+    let a: i64 = con.scard("nokey").unwrap();
+    assert_eq!(a, 0);
+    let b: i64 = con.scard("setkey").unwrap();
+    assert_eq!(b, 5);
+    let values3 = &["val3", "val5", "val7"][..];
+    let i: i64 = con.srem("setkey", values3).unwrap();
+    assert_eq!(i, 2);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));

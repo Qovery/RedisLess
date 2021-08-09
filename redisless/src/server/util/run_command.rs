@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -445,6 +445,59 @@ pub fn run_command_and_get_response<T: Storage>(
                     }
                     None => RedisResponse::single(Nil),
                 }
+            }
+            Command::SAdd(key, values) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype != "set".as_bytes() && keytype != "none".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut len = values.len();
+                match storage.sread(&key) {
+                    Some(old_vals) => {
+                        let diff: HashSet<_> = values.difference(old_vals).collect();
+                        len = diff.len();
+                        let vals: HashSet<_> = values.union(old_vals).cloned().collect();
+                        storage.swrite(&key, vals);
+                        RedisResponse::single(Integer(len as i64))
+                    }
+                    None => {
+                        storage.swrite(&key, values);
+                        RedisResponse::single(Integer(len as i64))
+                    }
+                }
+            }
+            Command::SCard(key) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Integer(0));
+                }
+                if keytype != "set".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let values = storage.sread(&key).unwrap();
+                let len = values.len() as i64;
+                RedisResponse::single(Integer(len))
+            }
+            Command::SRem(key, values) => {
+                let mut storage = lock_then_release(storage);
+                let keytype = storage.type_of(&key);
+                if keytype == "none".as_bytes() {
+                    return RedisResponse::single(Integer(0));
+                }
+                if keytype != "set".as_bytes() {
+                    return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                }
+                let mut vals = storage.sread(&key).unwrap().to_owned();
+                let mut rem = 0;
+                for v in values {
+                    if vals.remove(&v) {
+                        rem = rem + 1;
+                    }
+                }
+                storage.swrite(&key, vals);
+                RedisResponse::single(Integer(rem))
             }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
