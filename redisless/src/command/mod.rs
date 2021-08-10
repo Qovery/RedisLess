@@ -51,6 +51,9 @@ pub enum Command {
     SAdd(Key, SetValues),
     SCard(Key),
     SRem(Key, SetValues),
+    SUnion(Keys),
+    SInter(Keys),
+    SDiff(Keys),
     Del(Key),
     Incr(Key),
     IncrBy(Key, i64),
@@ -338,7 +341,45 @@ impl Command {
                     }
                     Ok(SRem(key, values_set))
                 }
+                b"SUNION" | b"SUnion" | b"Sunion" | b"sunion" => {
+                    let keys = &v[1..];
+                    if keys.is_empty() {
+                        return Err(ArgNumber);
+                    }
 
+                    let mut keys_vec = Keys::with_capacity(keys.len());
+                    for key in keys {
+                        let key = get_bytes_vec(Some(key))?;
+                        keys_vec.push(key);
+                    }
+                    Ok(SUnion(keys_vec))
+                }
+                b"SINTER" | b"SInter" | b"Sinter" | b"sinter" => {
+                    let keys = &v[1..];
+                    if keys.is_empty() {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut keys_vec = Keys::with_capacity(keys.len());
+                    for key in keys {
+                        let key = get_bytes_vec(Some(key))?;
+                        keys_vec.push(key);
+                    }
+                    Ok(SInter(keys_vec))
+                }
+                b"SDIFF" | b"SDiff" | b"Sdiff" | b"sdiff" => {
+                    let keys = &v[1..];
+                    if keys.is_empty() {
+                        return Err(ArgNumber);
+                    }
+
+                    let mut keys_vec = Keys::with_capacity(keys.len());
+                    for key in keys {
+                        let key = get_bytes_vec(Some(key))?;
+                        keys_vec.push(key);
+                    }
+                    Ok(SDiff(keys_vec))
+                }
                 b"DEL" | b"del" | b"Del" => {
                     let key = get_bytes_vec(v.get(1))?;
                     Ok(Del(key))
