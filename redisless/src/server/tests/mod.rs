@@ -1,9 +1,415 @@
-use redis::{Commands, Connection, RedisResult};
+use redis::{Commands, Connection, ToRedisArgs};
 use std::{thread::sleep, time::Duration};
 
 use crate::server::ServerState;
 use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
+
+struct TestClient {
+    server: Server,
+    con: Connection,
+}
+
+impl Drop for TestClient {
+    fn drop(&mut self) {
+        assert_eq!(self.server.stop(), Some(ServerState::Stopped));
+    }
+}
+
+impl TestClient {
+    fn connect(port: u16) -> Self {
+        let server = Server::new(InMemoryStorage::new(), port);
+        assert_eq!(server.start(), Some(ServerState::Started));
+
+        let con = redis::Client::open(format!("redis://127.0.0.1:{}/", port))
+            .unwrap()
+            .get_connection()
+            .unwrap();
+
+        TestClient { server, con }
+    }
+
+    fn get<K: ToRedisArgs>(&mut self, key: K) -> Option<String> {
+        self.con.get(key).ok()
+    }
+    fn set<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) {
+        self.con.set(key, value).unwrap()
+    }
+    fn incr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
+        self.con.incr(key, delta).unwrap()
+    }
+    fn decr<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, delta: V) {
+        self.con.decr(key, delta).unwrap()
+    }
+    fn hget<K: ToRedisArgs, F: ToRedisArgs>(&mut self, key: K, field: F) -> Option<String> {
+        self.con.hget(key, field).ok()
+    }
+    fn hset_multiple<K: ToRedisArgs, F: ToRedisArgs, V: ToRedisArgs>(
+        &mut self,
+        key: K,
+        items: &'static [(F, V)],
+    ) {
+        self.con.hset_multiple(key, items).unwrap()
+    }
+    fn del<K: ToRedisArgs>(&mut self, key: K) {
+        self.con.del(key).unwrap()
+    }
+    fn exists<K: ToRedisArgs>(&mut self, key: K) -> bool {
+        self.con.exists(key).unwrap()
+    }
+    fn expire<K: ToRedisArgs>(&mut self, key: K, seconds: usize) -> u8 {
+        self.con.expire(key, seconds).unwrap()
+    }
+    fn pexpire<K: ToRedisArgs>(&mut self, key: K, ms: usize) -> u8 {
+        self.con.pexpire(key, ms).unwrap()
+    }
+    fn ttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
+        self.con.ttl(key).unwrap()
+    }
+    fn pttl<K: ToRedisArgs>(&mut self, key: K) -> i32 {
+        self.con.pttl(key).unwrap()
+    }
+    fn set_multiple<K: ToRedisArgs, V: ToRedisArgs>(&mut self, items: &'static [(K, V)]) {
+        self.con.set_multiple(items).unwrap()
+    }
+    fn set_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, seconds: usize) {
+        self.con.set_ex(key, value, seconds).unwrap()
+    }
+    fn pset_ex<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V, milliseconds: usize) {
+        self.con.pset_ex(key, value, milliseconds).unwrap()
+    }
+    fn mset_nx<K: ToRedisArgs, V: ToRedisArgs>(&mut self, items: &'static [(K, V)]) -> u8 {
+        self.con.mset_nx(items).unwrap()
+    }
+    fn getset<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) -> Option<String> {
+        self.con.getset(key, value).ok()
+    }
+    fn append<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) -> usize {
+        self.con.append(key, value).unwrap()
+    }
+    fn llen<K: ToRedisArgs>(&mut self, key: K) -> usize {
+        self.con.llen(key).unwrap()
+    }
+    fn rpush<K: ToRedisArgs, V: ToRedisArgs>(&mut self, key: K, value: V) -> usize {
+        self.con.rpush(key, value).unwrap()
+    }
+}
+
+#[test]
+fn test_client_incr_by_integer() {
+    let mut t = TestClient::connect(1024);
+
+    // Arrange
+    t.set("integer +", 2500);
+    t.set("integer -", "17");
+    // Act
+    t.incr("integer +", 600);
+    t.incr("integer -", -30);
+    // Assert
+    assert_eq!(t.get("integer +").unwrap(), "3100");
+    assert_eq!(t.get("integer -").unwrap(), "-13");
+}
+
+#[test]
+fn test_client_decr_by_integer() {
+    let mut t = TestClient::connect(1025);
+
+    // Arrange
+    t.set("integer +", 120);
+    t.set("integer -", "24");
+    // Act
+    t.decr("integer +", 70);
+    t.decr("integer -", -6);
+    // Assert
+    assert_eq!(t.get("integer +").unwrap(), "50");
+    assert_eq!(t.get("integer -").unwrap(), "30");
+}
+
+#[test]
+fn test_client_ttl_pttl_error_cases() {
+    let mut t = TestClient::connect(1026);
+
+    // Arrange
+    t.set("key exists but timeout is not set", 3600);
+
+    // Act
+    let ret_timeout_not_set = (
+        t.ttl("key exists but timeout is not set"),
+        t.pttl("key exists but timeout is not set"),
+    );
+    let ret_non_existent = (
+        t.ttl("non-existent key is a -2 error"),
+        t.pttl("non-existent key is a -2 error"),
+    );
+
+    // Assert
+    assert_eq!(t.exists("key exists but timeout is not set"), true);
+    assert_eq!(ret_timeout_not_set, (-1, -1));
+
+    assert_eq!(t.exists("non-existent key is a -2 error"), false);
+    assert_eq!(ret_non_existent, (-2, -2));
+}
+
+#[test]
+fn test_client_expire_pexpire() {
+    let mut t = TestClient::connect(1027);
+
+    // Arrange
+    t.set("has timeout", "I will fade");
+
+    // Act
+    let dur_ms = 900_usize;
+    let ret_has_timeout = (
+        t.expire("has timeout", 86400_usize),
+        t.pexpire("has timeout", dur_ms),
+    );
+    let ret_non_existent = (
+        t.expire("non-existent", 78_usize),
+        t.pexpire("non-existent", 12_usize),
+    );
+
+    let ret_still_alive = t.get("has timeout").unwrap();
+    sleep(Duration::from_millis(dur_ms as u64));
+    let ret_expired_after_sleep = t.get("has timeout");
+
+    // Assert
+    assert_eq!(ret_has_timeout, (1, 1));
+    assert_eq!(ret_non_existent, (0, 0));
+
+    assert_eq!(ret_still_alive, "I will fade");
+    assert_eq!(ret_expired_after_sleep, None);
+}
+
+#[test]
+fn test_client_setex_psetex() {
+    let mut t = TestClient::connect(1028);
+
+    // Arrange
+    let ret_didnt_exist = (
+        !t.exists("a bird in the hand is worth"),
+        !t.exists("the devil's playground"),
+    );
+
+    // Act
+    let dur_ms = 1000_usize;
+    t.set_ex("a bird in the hand is worth", "two in the bush", 1_usize);
+    t.pset_ex("the devil's playground", "an idle mind", dur_ms);
+
+    let ret_still_alive = (
+        t.get("a bird in the hand is worth").unwrap(),
+        t.get("the devil's playground").unwrap(),
+    );
+    sleep(Duration::from_millis(dur_ms as u64));
+    let ret_expired_after_sleep = (
+        t.get("a bird in the hand is worth"),
+        t.get("the devil's playground"),
+    );
+
+    // Assert
+    assert_eq!(ret_didnt_exist, (true, true));
+    assert_eq!(ret_still_alive.0, "two in the bush");
+    assert_eq!(ret_still_alive.1, "an idle mind");
+    assert_eq!(ret_expired_after_sleep, (None, None));
+}
+
+#[test]
+fn test_client_getset() {
+    let mut t = TestClient::connect(1029);
+
+    // Arrange
+    t.set("queue of one person", "James Robert");
+
+    // Act
+    let ret_getset1 = t
+        .getset("queue of one person", "Patricia Jennifer")
+        .unwrap();
+    let ret_getset2 = t
+        .getset("queue of one person", "Barbara Susan Jessica")
+        .unwrap();
+    let ret_get = t.get("queue of one person").unwrap();
+
+    // Assert
+    assert_eq!(ret_getset1, "James Robert");
+    assert_eq!(ret_getset2, "Patricia Jennifer");
+    assert_eq!(ret_get, "Barbara Susan Jessica");
+}
+
+#[test]
+fn test_client_dbsize() {
+    let mut t = TestClient::connect(1030);
+
+    // Act
+    let ret_dbsize1: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.set("1", "january");
+    let ret_dbsize2: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.set("2", "february");
+    let ret_dbsize3: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    t.del("2");
+    let ret_dbsize4: u64 = redis::cmd("DBSIZE").query(&mut t.con).unwrap();
+
+    // Assert
+    assert_eq!(ret_dbsize1, 0);
+    assert_eq!(ret_dbsize2, 1);
+    assert_eq!(ret_dbsize3, 2);
+    assert_eq!(ret_dbsize4, 1);
+}
+
+#[test]
+fn test_client_mset() {
+    let mut t = TestClient::connect(1031);
+
+    // Arrange
+    let id_fr = &[
+        ("senin", "lundi"),
+        ("rabu", "mercredi"),
+        ("jumat", "vendredi"),
+    ];
+
+    // Act
+    t.set_multiple(id_fr);
+
+    let ret_days = (
+        t.get("ret_days of the week"),
+        t.get("senin").unwrap(),
+        t.get("rabu").unwrap(),
+        t.get("jumat").unwrap(),
+    );
+
+    // Assert
+    assert_eq!(ret_days.0, None);
+    assert_eq!(ret_days.1, "lundi");
+    assert_eq!(ret_days.2, "mercredi");
+    assert_eq!(ret_days.3, "vendredi");
+}
+
+#[test]
+fn test_client_mset_nx() {
+    let mut t = TestClient::connect(1032);
+
+    // Arrange
+    let telephony = &[
+        ("l", "lima"),
+        ("m", "mike"),
+        ("n", "november"),
+        ("o", "oscar"),
+        ("p", "papa"),
+    ];
+
+    let ret_mset_nx: u8 = t.mset_nx(telephony);
+
+    let ret_lmnop = (
+        t.get("l").unwrap(),
+        t.get("m").unwrap(),
+        t.get("n").unwrap(),
+        t.get("o").unwrap(),
+        t.get("p").unwrap(),
+    );
+
+    // Act
+    let ps = &[("p", "post"), ("s", "script")];
+    let ret_contains_existing = t.mset_nx(ps);
+
+    // Assert
+    assert_eq!(ret_mset_nx, 1);
+    assert_eq!(ret_lmnop.0, "lima");
+    assert_eq!(ret_lmnop.1, "mike");
+    assert_eq!(ret_lmnop.2, "november");
+    assert_eq!(ret_lmnop.3, "oscar");
+    assert_eq!(ret_lmnop.4, "papa");
+
+    assert_eq!(ret_contains_existing, 0);
+}
+
+#[test]
+fn test_client_hget_hset_multiple() {
+    let mut t = TestClient::connect(1033);
+
+    // Arrange
+    let units = &[
+        ("foot", "12 inches"),
+        ("inch", "2.5 centimetres"),
+        ("mile", "1.5 kilometres"),
+    ];
+
+    // Act
+    t.hset_multiple("imperial", units);
+
+    // Assert
+    let ret_units = (
+        t.hget("imperial", "yard"),
+        t.hget("imperial", "foot").unwrap(),
+        t.hget("imperial", "inch").unwrap(),
+        t.hget("imperial", "mile").unwrap(),
+    );
+
+    assert_eq!(ret_units.0, None);
+    assert_eq!(ret_units.1, "12 inches");
+    assert_eq!(ret_units.2, "2.5 centimetres");
+    assert_eq!(ret_units.3, "1.5 kilometres");
+}
+#[test]
+fn test_client_rpush_lpush() {
+    let mut t = TestClient::connect(1034);
+
+    // Arrange
+    let abc = &["a", "b", "c"];
+    let def = &["d", "e", "f"];
+    let ghi = &["g", "h", "i"];
+    let jkl = &["j", "k", "l"];
+
+    // Act
+    let ret_rpush1 = t.rpush("list", abc);
+    let ret_rpush2 = t.rpush("list", def);
+    let ret_lpush1 = t.rpush("list", ghi);
+    let ret_lpush2 = t.rpush("list", jkl);
+
+    // Assert
+    assert_eq!(ret_rpush1, 3);
+    assert_eq!(ret_rpush2, 6);
+    assert_eq!(ret_lpush1, 9);
+    assert_eq!(ret_lpush2, 12);
+}
+#[test]
+fn test_client_llen() {
+    let mut t = TestClient::connect(1035);
+
+    // Arrange
+    let values = &[1, 2, 3, 4];
+    t.rpush("k", values);
+
+    // Act
+    let ret_llen1 = t.llen("k");
+    let ret_llen2 = t.llen("wasn't set");
+
+    // Assert
+    assert_eq!(ret_llen1, 4);
+    assert_eq!(ret_llen2, 0);
+}
+
+#[test]
+fn test_client_append() {
+    let mut t = TestClient::connect(1036);
+
+    // Arrange
+    t.set("nb", "nota");
+
+    // Act
+    let ret_append1 = t.append("nb", "bene");
+    let ret_get1 = t.get("nb").unwrap();
+
+    let ret_append2 = t.append("behaves like SET", "hello");
+    let ret_get2 = t.get("behaves like SET").unwrap();
+
+    // Assert
+    assert_eq!(ret_append1, "notabene".len());
+    assert_eq!(ret_get1, "notabene");
+
+    assert_eq!(ret_append2, "hello".len());
+    assert_eq!(ret_get2, "hello");
+}
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
     let server = Server::new(InMemoryStorage::new(), port);
@@ -11,360 +417,6 @@ fn get_redis_client_connection(port: u16) -> (Server, Connection) {
 
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
     (server, redis_client.get_connection().unwrap())
-}
-#[test]
-#[serial]
-fn test_incr_decr_commands() {
-    let (server, mut con) = get_redis_client_connection(3365);
-
-    let _: () = con.set("some_number", "12").unwrap();
-    let _: () = con.incr("some_number", 1).unwrap();
-    let some_number: u32 = con.get("some_number").unwrap();
-    assert_eq!(some_number, 13_u32);
-
-    let _: () = con.set("n", "100").unwrap();
-    let _: () = con.decr("n", 1).unwrap();
-    let n: u32 = con.get("n").unwrap();
-    assert_eq!(n, 99_u32);
-
-    let _: () = con.set("0", "12").unwrap();
-    let _: () = con.incr("0", 500).unwrap();
-    let value: u32 = con.get("0").unwrap();
-    assert_eq!(value, 512_u32);
-
-    let _: () = con.set("63", "89").unwrap();
-    let _: () = con.decr("63", 10).unwrap();
-    let value: u32 = con.get("63").unwrap();
-    assert_eq!(value, 79_u32);
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn test_redis_implementation() {
-    let (server, mut con) = get_redis_client_connection(3366);
-
-    let _: () = con.set("key", "value").unwrap();
-    let exists: bool = con.exists("key").unwrap();
-    assert_eq!(exists, true);
-    let x: String = con.get("key").unwrap();
-    assert_eq!(x, "value");
-
-    let x: RedisResult<String> = con.get("not-existing-key");
-    assert_eq!(x.is_err(), true);
-    let exists: bool = con.exists("non-existant-key").unwrap();
-    assert_eq!(exists, false);
-
-    let x: u32 = con.del("key").unwrap();
-    assert_eq!(x, 1);
-
-    let x: u32 = con.del("key").unwrap();
-    assert_eq!(x, 0);
-
-    let _: () = con.set("key2", "original value").unwrap();
-    let x: String = con.get("key2").unwrap();
-    assert_eq!(x, "original value");
-
-    let x: u32 = con.set_nx("key2", "new value").unwrap();
-    assert_eq!(x, 0);
-
-    let x: String = con.get("key2").unwrap();
-    assert_eq!(x, "original value");
-
-    let x: u32 = con.set_nx("key3", "value3").unwrap();
-    assert_eq!(x, 1);
-
-    let x: String = con.get("key3").unwrap();
-    assert_eq!(x, "value3");
-
-    let _: () = con.set("intkey", "10").unwrap();
-    let _: () = con.incr("intkey", 1).unwrap();
-
-    let x: u32 = con.get("intkey").unwrap();
-    assert_eq!(x, 11u32);
-
-    let _: () = con.set("intkeyby", "10").unwrap();
-    let _: () = con.incr("intkeyby", "10").unwrap();
-
-    let x: u32 = con.get("intkeyby").unwrap();
-    assert_eq!(x, 20u32);
-
-    let _: () = con.set("intkeybyneg", "10").unwrap();
-    let _: () = con.incr("intkeybyneg", "-5").unwrap();
-
-    let x: u32 = con.get("intkeybyneg").unwrap();
-    assert_eq!(x, 5u32);
-
-    let _: () = con.incr("keydoesnotexist", "20").unwrap();
-
-    let x: u32 = con.get("keydoesnotexist").unwrap();
-    assert_eq!(x, 20u32);
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn expire_and_ttl() {
-    let (server, mut con) = get_redis_client_connection(3369);
-
-    let ttl: i32 = con.ttl("key").unwrap();
-    assert_eq!(ttl, -2);
-    let ttl: i32 = con.pttl("key").unwrap();
-    assert_eq!(ttl, -2);
-    // EXPIRE
-    let duration: usize = 50;
-    let _: () = con.set("key", "value").unwrap();
-    let x: String = con.get("key").unwrap();
-    assert_eq!(x, "value");
-    let ttl: i32 = con.ttl("key").unwrap();
-    assert_eq!(ttl, -1);
-
-    let ret_val: u32 = con.pexpire("key", duration).unwrap();
-    assert_eq!(ret_val, 1);
-    let ttl: i32 = con.pttl("key").unwrap();
-    assert!(ttl <= duration as i32 && duration as i32 - 30 < ttl);
-    let ttl: i32 = con.ttl("key").unwrap();
-    assert_eq!(ttl, (duration / 1000) as i32);
-    sleep(Duration::from_millis(duration as u64));
-    let x: Option<String> = con.get("key").ok();
-    assert_eq!(x, None);
-
-    // PEXPIRE
-    let duration: usize = 2387;
-    let _: () = con.set("key", "value").unwrap();
-    let x: String = con.get("key").unwrap();
-    assert_eq!(x, "value");
-
-    let ret_val: u32 = con.pexpire("key", duration).unwrap();
-    assert_eq!(ret_val, 1);
-    let ttl: i32 = con.pttl("key").unwrap();
-    assert!(ttl <= duration as i32 && duration as i32 - 30 < ttl);
-    sleep(Duration::from_millis(duration as u64));
-    let x: Option<String> = con.get("key").ok();
-    assert_eq!(x, None);
-    let ttl: i32 = con.pttl("key").unwrap();
-    assert_eq!(ttl, -2);
-
-    // SETEX
-    let duration: usize = 2;
-    let _: () = con.set_ex("key", "value", duration).unwrap();
-    let x: String = con.get("key").unwrap();
-    assert_eq!(x, "value");
-
-    sleep(Duration::from_secs(duration as u64));
-    let x: Option<String> = con.get("key").ok();
-    assert_eq!(x, None);
-
-    // PSETEX
-    let duration = 1984_usize;
-    let _: () = con.pset_ex("key", "value", duration).unwrap();
-    let x: String = con.get("key").unwrap();
-    assert_eq!(x, "value");
-    sleep(Duration::from_millis(duration as u64));
-    let x: Option<String> = con.get("key").ok();
-    assert_eq!(x, None);
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn get_set() {
-    let (server, mut con) = get_redis_client_connection(3332);
-
-    let _: String = con.set("key1", "valueA").unwrap();
-    let x: String = con.getset("key1", "valueB").unwrap();
-    assert_eq!(x, "valueA");
-
-    let x: String = con.getset("key1", "valueC").unwrap();
-    assert_eq!(x, "valueB");
-
-    let x: String = con.get("key1").unwrap();
-    assert_eq!(x, "valueC");
-
-    let x: Option<String> = con.getset("key2", "value2").ok();
-    assert_eq!(x, None);
-
-    let x: String = con.get("key2").unwrap();
-    assert_eq!(x, "value2");
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn dbsize() {
-    let (server, mut con) = get_redis_client_connection(3331);
-
-    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
-    assert_eq!(x, 0);
-    let _: String = con.set("key1", "valueA").unwrap();
-    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
-    assert_eq!(x, 1);
-    let _: String = con.set("key2", "valueA").unwrap();
-    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
-    assert_eq!(x, 2);
-    let _: u32 = con.del("key2").unwrap();
-    let x: u64 = redis::cmd("DBSIZE").query(&mut con).unwrap(); //con.dbsize().unwrap();
-    assert_eq!(x, 1);
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn mset() {
-    let (server, mut con) = get_redis_client_connection(3343);
-
-    let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
-
-    let _ = con.set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
-
-    let exes: Vec<String> = con.get(&["key0", "key1", "key2"][..]).unwrap();
-    assert_eq!(exes[0], "val0");
-    assert_eq!(exes[1], "val1");
-    assert_eq!(exes[2], "val2");
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn mset_nx() {
-    let (server, mut con) = get_redis_client_connection(3342);
-
-    let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
-
-    let x = con
-        .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
-        .unwrap();
-    assert_eq!(x, 1); // keys were set
-
-    let exes: Vec<String> = con.get(&["key0", "key1", "key2"][..]).unwrap();
-    assert_eq!(exes[0], "val0");
-    assert_eq!(exes[1], "val1");
-    assert_eq!(exes[2], "val2");
-
-    let key_value_pairs = &[("key4", "val4"), ("key1", "val5")][..];
-    let x = con
-        .mset_nx::<&'static str, &'static str, u32>(key_value_pairs)
-        .unwrap();
-    assert_eq!(x, 0); // a key was repeated so none were set
-    let x: String = con.get("key1").unwrap();
-    assert_eq!(x, "val1"); // key1 is still val1
-    let x: Option<String> = con.get("key4").ok();
-    assert_eq!(x, None); // key4 was not set
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn mget() {
-    let (server, mut con) = get_redis_client_connection(3345);
-
-    let key_value_pairs = &[("key0", "val0"), ("key1", "val1"), ("key2", "val2")][..];
-
-    let _ = con.set_multiple::<&'static str, &'static str, u32>(key_value_pairs);
-
-    let keys = vec!["key0", "key1", "key2"];
-    let exes: Vec<String> = con.get(keys).unwrap();
-    assert_eq!(exes[0], "val0");
-    assert_eq!(exes[1], "val1");
-    assert_eq!(exes[2], "val2");
-
-    let _: () = con.del("key0").unwrap();
-    let _: () = con.del("key1").unwrap();
-
-    let keys = vec!["key0", "key1", "key2"];
-    let exes: Vec<Option<String>> = con.get(keys).unwrap();
-    assert_eq!(exes[0], None);
-    assert_eq!(exes[1], None);
-    assert_eq!(exes[2], Some("val2".to_string()));
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn hset() {
-    let (server, mut con) = get_redis_client_connection(3347);
-
-    let key_value_pairs = &[("fkey0", "val0"), ("fkey1", "val1"), ("fkey2", "val2")][..];
-    let _: () = con
-        .hset_multiple::<&'static str, &'static str, &'static str, ()>("key0", key_value_pairs)
-        .unwrap();
-    let x: String = con.hget("key0", "fkey0").unwrap();
-    assert_eq!(x, "val0");
-    let x: String = con.hget("key0", "fkey1").unwrap();
-    assert_eq!(x, "val1");
-    let x: String = con.hget("key0", "fkey2").unwrap();
-    assert_eq!(x, "val2");
-    let x: Option<String> = con.hget("key0", "fkey3").ok();
-    assert_eq!(x, None);
-    let x: Option<String> = con.hget("key1", "fkey3").ok();
-    assert_eq!(x, None);
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn llen() {
-    let (server, mut con) = get_redis_client_connection(3377);
-
-    let values = &["val1", "val2", "val3", "val4"];
-    let x = con
-        .rpush::<&'static str, &[&str], u32>("lkey", values)
-        .unwrap();
-
-    let l: i64 = con.llen("lkey").unwrap();
-    assert_eq!(l, 4);
-
-    let x: i64 = con.llen("new_key").unwrap();
-    assert_eq!(x, 0);
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn rpush() {
-    let (server, mut con) = get_redis_client_connection(3344);
-    let values = &["val1", "val2", "val3"][..];
-    let x = con
-        .rpush::<&'static str, &[&str], u32>("listkey", values)
-        .unwrap();
-    assert_eq!(x, 3);
-
-    let values2 = &["val4", "val5", "val6"][..];
-    let y = con
-        .rpush::<&'static str, &[&str], u32>("listkey", values2)
-        .unwrap();
-    assert_eq!(y, 6);
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
-}
-
-#[test]
-#[serial]
-fn lpush() {
-    let (server, mut con) = get_redis_client_connection(3348);
-    let values = &["val1", "val2", "val3"][..];
-    let _ = con
-        .rpush::<&'static str, &[&str], u32>("listkey", values)
-        .unwrap();
-
-    let values2 = &["val4", "val5", "val6"][..];
-    let x = con
-        .lpush::<&'static str, &[&str], u32>("listkey", values2)
-        .unwrap();
-    assert_eq!(x, 6);
-    let y = con
-        .lpush::<&'static str, &[&str], u32>("listkey2", values2)
-        .unwrap();
-    assert_eq!(y, 3);
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
 #[test]
@@ -514,22 +566,4 @@ fn start_and_stop_server_multiple_times() {
         assert_eq!(server.start(), Some(ServerState::Started));
         assert_eq!(server.stop(), Some(ServerState::Stopped));
     }
-}
-
-#[test]
-fn append() {
-    let (server, mut con) = get_redis_client_connection(3346);
-
-    let _: String = con.set("key1", "value1").unwrap();
-    let len: usize = con.append("key1", "value1").unwrap();
-    assert_eq!(len, 12);
-    let x: String = con.get("key1").unwrap();
-    assert_eq!(x, "value1value1");
-
-    let len: usize = con.append("key2", "value2").unwrap();
-    assert_eq!(len, 6);
-    let x: String = con.get("key2").unwrap();
-    assert_eq!(x, "value2");
-
-    assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
