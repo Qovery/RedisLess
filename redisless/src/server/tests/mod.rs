@@ -501,6 +501,27 @@ fn sadd_scard_srem() {
 
 #[test]
 #[serial]
+fn sunion_sinter_sdiff() {
+    let (server, mut con) = get_redis_client_connection(3358);
+    let values = &["val1", "val2", "val3", "val4"][..];
+    let values2 = &["val4", "val5", "val6"][..];
+    let values3 = &["val1", "val4", "val7"][..];
+    let _: i64 = con.sadd("setkey1", values).unwrap();
+    let _: i64 = con.sadd("setkey2", values2).unwrap();
+    let _: i64 = con.sadd("setkey3", values3).unwrap();
+    let keys = &["setkey1", "setkey2", "nokey", "setkey3"][..];
+
+    let x: Vec<String> = con.sunion(keys).unwrap();
+    assert_eq!(x.len(), 7);
+    let y: Vec<String> = con.sinter(keys).unwrap();
+    assert_eq!(y.len(), 1);
+    let z: Vec<String> = con.sdiff(keys).unwrap();
+    assert_eq!(z.len(), 2);
+    assert_eq!(server.stop(), Some(ServerState::Stopped));
+}
+
+#[test]
+#[serial]
 fn start_and_stop_server() {
     let server = Server::new(InMemoryStorage::new(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));

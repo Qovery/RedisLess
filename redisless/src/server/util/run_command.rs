@@ -499,6 +499,96 @@ pub fn run_command_and_get_response<T: Storage>(
                 storage.swrite(&key, vals);
                 RedisResponse::single(Integer(rem))
             }
+            Command::SUnion(keys_vec) => {
+                let mut storage = lock_then_release(storage);
+                let mut keys = vec![];
+                for key in keys_vec {
+                    let keytype = storage.type_of(&key);
+                    if keytype == "none".as_bytes() {
+                        continue;
+                    }
+                    if keytype != "set".as_bytes() {
+                        return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                    }
+                    keys.push(key.to_vec());
+                }
+                let mut responses = Vec::<RedisResponseType>::new();
+                if keys.is_empty() {
+                    return RedisResponse::array(responses);
+                }
+                let mut result: HashSet<_> = storage.sread(&keys[0]).unwrap().to_owned();
+                let mut val: HashSet<_>;
+                keys.remove(0);
+                for key in keys {
+                    val = storage.sread(&key).unwrap().to_owned();
+                    result = result.union(&val).cloned().collect();
+                }
+                for elem in result {
+                    let response = RedisResponseType::SimpleString(elem);
+                    responses.push(response);
+                }
+                RedisResponse::array(responses)
+            }
+            Command::SInter(keys_vec) => {
+                let mut storage = lock_then_release(storage);
+                let mut keys = vec![];
+                for key in keys_vec {
+                    let keytype = storage.type_of(&key);
+                    if keytype == "none".as_bytes() {
+                        continue;
+                    }
+                    if keytype != "set".as_bytes() {
+                        return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                    }
+                    keys.push(key.to_vec());
+                }
+                let mut responses = Vec::<RedisResponseType>::new();
+                if keys.is_empty() {
+                    return RedisResponse::array(responses);
+                }
+                let mut result: HashSet<_> = storage.sread(&keys[0]).unwrap().to_owned();
+                let mut val: HashSet<_>;
+                keys.remove(0);
+                for key in keys {
+                    val = storage.sread(&key).unwrap().to_owned();
+                    result = result.intersection(&val).cloned().collect();
+                }
+                for elem in result {
+                    let response = RedisResponseType::SimpleString(elem);
+                    responses.push(response);
+                }
+                RedisResponse::array(responses)
+            }
+            Command::SDiff(keys_vec) => {
+                let mut storage = lock_then_release(storage);
+                let mut keys = vec![];
+                for key in keys_vec {
+                    let keytype = storage.type_of(&key);
+                    if keytype == "none".as_bytes() {
+                        continue;
+                    }
+                    if keytype != "set".as_bytes() {
+                        return RedisResponse::error(RedisCommandError::WrongTypeOperation);
+                    }
+                    keys.push(key.to_vec());
+                }
+                let mut responses = Vec::<RedisResponseType>::new();
+                if keys.is_empty() {
+                    return RedisResponse::array(responses);
+                }
+                let mut result: HashSet<_> = storage.sread(&keys[0]).unwrap().to_owned();
+                let mut val: HashSet<_>;
+                keys.remove(0);
+                for key in keys {
+                    val = storage.sread(&key).unwrap().to_owned();
+                    result = result.difference(&val).cloned().collect();
+                }
+                for elem in result {
+                    let response = RedisResponseType::SimpleString(elem);
+                    responses.push(response);
+                }
+                RedisResponse::array(responses)
+            }
             Command::Del(k) => {
                 let d = lock_then_release(storage).remove(k.as_slice());
                 RedisResponse::single(Integer(d as i64))
