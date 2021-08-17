@@ -8,7 +8,7 @@ use crate::{
 #[test]
 #[serial]
 fn start_and_stop_server_from_c_binding() {
-    let port = 4444 as u16;
+    let port = 4444_u16;
     let server = unsafe { redisless_server_new(port) };
 
     unsafe {

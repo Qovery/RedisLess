@@ -30,7 +30,7 @@ pub enum RedisCommandError {
 }
 
 impl RedisCommandError {
-    pub fn to_vec(self) -> Vec<u8> {
+    pub fn to_vec(&self) -> Vec<u8> {
         format!("-{}\r\n", self).as_bytes().to_vec()
     }
 }

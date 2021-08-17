@@ -3,8 +3,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use chrono::format::format;
-
 use crate::{
     command::Command,
     protocol::response::{RedisResponse, RedisResponseType},
@@ -274,7 +272,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 let values = storage.lread(&key).unwrap().to_vec();
                 let len = values.len() as i64;
                 if index < 0 {
-                    index = index + len;
+                    index += len;
                 }
                 if index < 0 || index >= len {
                     return RedisResponse::single(Nil);
@@ -297,7 +295,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 let mut values = storage.lread(&key).unwrap().to_vec();
                 let len = values.len() as i64;
                 if index < 0 {
-                    index = index + len;
+                    index += len;
                 }
                 if index < 0 || index >= len {
                     return RedisResponse::error(RedisCommandError::IndexOutOfRange);
@@ -323,7 +321,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 match index {
                     Some(mut i) => {
                         if place == b"AFTER" {
-                            i = i + 1;
+                            i += 1;
                         }
                         values.insert(i, value);
                         let len = values.len();
@@ -347,10 +345,10 @@ pub fn run_command_and_get_response<T: Storage>(
                 let mut start = start;
                 let mut stop = stop;
                 if start < 0 {
-                    start = start + len;
+                    start += len;
                 }
                 if stop < 0 {
-                    stop = stop + len;
+                    stop += len;
                 }
                 if start < 0 {
                     start = 0;
@@ -493,7 +491,7 @@ pub fn run_command_and_get_response<T: Storage>(
                 let mut rem = 0;
                 for v in values {
                     if vals.remove(&v) {
-                        rem = rem + 1;
+                        rem += 1;
                     }
                 }
                 storage.swrite(&key, vals);

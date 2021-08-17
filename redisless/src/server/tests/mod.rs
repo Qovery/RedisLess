@@ -6,7 +6,7 @@ use crate::storage::in_memory::InMemoryStorage;
 use crate::Server;
 
 fn get_redis_client_connection(port: u16) -> (Server, Connection) {
-    let server = Server::new(InMemoryStorage::new(), port);
+    let server = Server::new(InMemoryStorage::default(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
 
     let redis_client = redis::Client::open(format!("redis://127.0.0.1:{}/", port)).unwrap();
@@ -47,14 +47,14 @@ fn test_redis_implementation() {
 
     let _: () = con.set("key", "value").unwrap();
     let exists: bool = con.exists("key").unwrap();
-    assert_eq!(exists, true);
+    assert!(exists);
     let x: String = con.get("key").unwrap();
     assert_eq!(x, "value");
 
     let x: RedisResult<String> = con.get("not-existing-key");
-    assert_eq!(x.is_err(), true);
+    assert!(x.is_err());
     let exists: bool = con.exists("non-existant-key").unwrap();
-    assert_eq!(exists, false);
+    assert!(!exists);
 
     let x: u32 = con.del("key").unwrap();
     assert_eq!(x, 1);
@@ -315,7 +315,7 @@ fn llen() {
     let (server, mut con) = get_redis_client_connection(3377);
 
     let values = &["val1", "val2", "val3", "val4"];
-    let x = con
+    let _ = con
         .rpush::<&'static str, &[&str], u32>("lkey", values)
         .unwrap();
 
@@ -412,7 +412,7 @@ fn rpop_lpop() {
     let y: String = con.lpop("listkey").unwrap();
     assert_eq!(y, "val1");
     let z: bool = con.exists("listkey").unwrap();
-    assert_eq!(z, false);
+    assert!(!z);
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
@@ -473,7 +473,7 @@ fn ltrim_lrem_rpoplpush() {
     let b: String = con.rpoplpush("src", "dest").unwrap();
     assert_eq!(b, "val1");
     let c: bool = con.exists("src").unwrap();
-    assert_eq!(c, false);
+    assert!(!c);
 
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
@@ -502,14 +502,14 @@ fn sadd_scard_srem() {
 #[test]
 #[serial]
 fn start_and_stop_server() {
-    let server = Server::new(InMemoryStorage::new(), 3340);
+    let server = Server::new(InMemoryStorage::default(), 3340);
     assert_eq!(server.start(), Some(ServerState::Started));
     assert_eq!(server.stop(), Some(ServerState::Stopped));
 }
 
 #[test]
 fn start_and_stop_server_multiple_times() {
-    let server = Server::new(InMemoryStorage::new(), 3341);
+    let server = Server::new(InMemoryStorage::default(), 3341);
     for _ in 0..9 {
         assert_eq!(server.start(), Some(ServerState::Started));
         assert_eq!(server.stop(), Some(ServerState::Stopped));

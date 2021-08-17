@@ -115,8 +115,8 @@ impl Command {
                     for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
-                                let key = get_bytes_vec(Some(&key))?;
-                                let value = get_bytes_vec(Some(&value))?;
+                                let key = get_bytes_vec(Some(key))?;
+                                let value = get_bytes_vec(Some(value))?;
                                 items.push((key, value));
                             }
                             _ => unreachable!(), // pairs has even length so each chunk will have len 2
@@ -136,8 +136,8 @@ impl Command {
                     for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
-                                let key = get_bytes_vec(Some(&key))?;
-                                let value = get_bytes_vec(Some(&value))?;
+                                let key = get_bytes_vec(Some(key))?;
+                                let value = get_bytes_vec(Some(value))?;
                                 items.push((key, value));
                             }
                             _ => unreachable!(),
@@ -203,8 +203,8 @@ impl Command {
                     for pair in pairs.chunks_exact(chunk_size) {
                         match pair {
                             [key, value] => {
-                                let key = get_bytes_vec(Some(&key))?;
-                                let value = get_bytes_vec(Some(&value))?;
+                                let key = get_bytes_vec(Some(key))?;
+                                let value = get_bytes_vec(Some(value))?;
                                 items.push((key, value));
                             }
                             _ => unreachable!(),

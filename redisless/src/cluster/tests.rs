@@ -1,11 +1,16 @@
+#[cfg(test)]
+cfg_if::cfg_if! {
+    if #[cfg(test)] {
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
-
 use crate::cluster::node::ClusterNode;
 use crate::cluster::peer::{Peer, PeersDiscovery, DEFAULT_NODE_LISTENING_PORT};
 use crate::cluster::util::{
     get_ip_addresses, get_local_network_ip_addresses, get_range_from_ip_address, scan_ip_range,
     Range,
 };
+} else {
+    }
+}
 
 #[test]
 fn start_cluster() {
@@ -15,7 +20,7 @@ fn start_cluster() {
 #[test]
 fn list_ip_addresses() {
     let ip_addresses = get_ip_addresses();
-    assert!(ip_addresses.len() > 0);
+    assert!(!ip_addresses.is_empty());
 }
 
 #[test]

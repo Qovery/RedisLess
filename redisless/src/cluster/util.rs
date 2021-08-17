@@ -1,4 +1,4 @@
-use std::io::{BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::thread;
 use std::time::Duration;
@@ -27,7 +27,7 @@ pub fn get_local_network_ip_addresses(ip_addresses: Vec<IpAddr>) -> Vec<IpAddr> 
 pub fn get_ip_addresses() -> Vec<IpAddr> {
     let mut ip_addresses = vec![];
 
-    for interfaces in get_if_addrs::get_if_addrs() {
+    if let Ok(interfaces) = get_if_addrs::get_if_addrs() {
         for interface in interfaces {
             ip_addresses.push(interface.ip());
         }
@@ -36,6 +36,7 @@ pub fn get_ip_addresses() -> Vec<IpAddr> {
     ip_addresses
 }
 
+#[allow(dead_code)]
 pub enum Range {
     Sixteen,
     TwentyFour,
@@ -46,6 +47,7 @@ pub enum Range {
 /// - 10.0.0.0/8
 /// - 172.16.0.0/12
 /// - 192.168.0.0/16
+#[allow(dead_code)]
 pub fn get_range_from_ip_address(ip_address: IpAddr, range: Range) -> Vec<IpAddr> {
     let ip_address = match ip_address {
         IpAddr::V4(ip_address) => ip_address,
@@ -63,7 +65,7 @@ pub fn get_range_from_ip_address(ip_address: IpAddr, range: Range) -> Vec<IpAddr
                 format!("10.{}.{}.255", b, c).parse().unwrap(),
             ),
         }, // 10.0.0.0/8
-        [172, b, c, _] if b >= 16 && b <= 31 => match range {
+        [172, b, c, _] if (16..=31).contains(&b) => match range {
             Range::Sixteen => Ipv4AddrRange::new(
                 format!("172.{}.0.0", b).parse().unwrap(),
                 format!("172.{}.255.255", b).parse().unwrap(),
@@ -88,13 +90,14 @@ pub fn get_range_from_ip_address(ip_address: IpAddr, range: Range) -> Vec<IpAddr
 
     ip_addresses
         .into_iter()
-        .map(|ip_address| IpAddr::V4(ip_address))
+        .map(IpAddr::V4)
         .collect()
 }
 
 enum ParallelResponse<T> {
     Ok(T),
     Continue,
+    #[allow(dead_code)]
     End,
 }
 

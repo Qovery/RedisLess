@@ -25,10 +25,10 @@ enum RedisResponseInner {
 
 impl RedisResponseType {
     // move out of the enum
-    fn to_vec(self) -> Vec<u8> {
+    fn to_vec(&self) -> Vec<u8> {
         use RedisResponseType::*;
         match self {
-            SimpleString(s) | BulkString(s) => s,
+            SimpleString(s) | BulkString(s) => s.clone(),
             Integer(num) => num.to_string().as_bytes().to_vec(),
             Nil => NIL.to_vec(),
         }
@@ -75,10 +75,7 @@ impl RedisResponse {
         }
     }
     pub fn is_quit(&self) -> bool {
-        match self.responses {
-            RedisResponseInner::Quit => true,
-            _ => false,
-        }
+        matches!(self.responses, RedisResponseInner::Quit)
     }
 
     pub fn single(response: RedisResponseType) -> Self {

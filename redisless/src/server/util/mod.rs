@@ -87,7 +87,7 @@ pub fn handle_request<T: Storage>(
     }
 
     let res = run_command_and_get_response(storage, &buf);
-    let quit = if res.is_quit() { true } else { false };
+    let quit = res.is_quit();
     let reply = res.reply();
     //eprintln!("?{}", std::str::from_utf8(&reply).unwrap());
     let _ = stream.write(&reply);
