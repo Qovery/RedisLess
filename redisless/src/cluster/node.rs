@@ -5,11 +5,8 @@ use rand::rngs::OsRng;
 use raft::log::memory::InMemoryLog;
 use raft::node::Node;
 
-use crate::cluster::peer::{Peer, Peers, PeersDiscovery, DEFAULT_NODE_LISTENING_PORT};
-use crate::cluster::util::{get_ip_addresses, get_local_network_ip_addresses, scan_ip_range};
+use crate::cluster::peer::{Peer, PeersDiscovery};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::borrow::Borrow;
-use std::collections::{HashSet, LinkedList};
 use std::thread;
 use std::time::Duration;
 
@@ -20,9 +17,15 @@ pub const GETINFO_RESPONSE: &[u8; 9] = b"redisless";
 type RaftNode = Node<InMemoryLog, OsRng, String>;
 
 pub struct ClusterNode {
+    #[allow(dead_code)]
     node: RaftNode,
+
+    #[allow(dead_code)]
     listening_socket_addr: SocketAddr,
+    
+    #[allow(dead_code)]
     peer_receiver: Receiver<Peer>,
+    
     listener_started: bool,
     search_peers_started: bool,
 }

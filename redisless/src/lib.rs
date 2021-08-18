@@ -16,16 +16,19 @@ mod protocol;
 pub mod server;
 pub mod storage;
 
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_new(port: u16) -> *mut Server {
-    Box::into_raw(Box::new(Server::new(InMemoryStorage::new(), port)))
+    Box::into_raw(Box::new(Server::new(InMemoryStorage::default(), port)))
 }
 
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_free(server: *mut Server) {
     let _ = Box::from_raw(server);
 }
 
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_start(server: *mut Server) -> bool {
     let server = match server.as_ref() {
@@ -39,6 +42,7 @@ pub unsafe extern "C" fn redisless_server_start(server: *mut Server) -> bool {
     }
 }
 
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn redisless_server_stop(server: *mut Server) -> bool {
     let server = match server.as_ref() {

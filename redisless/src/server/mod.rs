@@ -199,7 +199,7 @@ fn start_server<T: Storage + Send + 'static>(
     for stream in listener.incoming() {
         match stream {
             Ok(tcp_stream) => {
-                handle_tcp_stream(tcp_stream, &thread_pool, &state_send, &state_recv, &storage);
+                handle_tcp_stream(tcp_stream, &thread_pool, state_send, state_recv, storage);
             }
             Err(err) if err.kind() == ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(10));
@@ -209,7 +209,7 @@ fn start_server<T: Storage + Send + 'static>(
             }
         }
 
-        if stop_sig_received(&state_recv, &state_send) {
+        if stop_sig_received(state_recv, state_send) {
             // let's gracefully shutdown the server
             break;
         }

@@ -13,8 +13,8 @@ pub struct InMemoryStorage {
     hash_store: HashMap<RedisString, RedisHashMap>,
 }
 
-impl InMemoryStorage {
-    pub fn new() -> Self {
+impl Default for InMemoryStorage {
+    fn default() -> Self {
         Self {
             data_mapper: HashMap::new(),
             string_store: HashMap::new(),
@@ -149,8 +149,7 @@ impl Storage for InMemoryStorage {
                     None
                 }
                 false => {
-                    let values = self.list_store.get(key);
-                    values
+                    self.list_store.get(key)
                 }
             }
         } else {
@@ -172,8 +171,7 @@ impl Storage for InMemoryStorage {
                     None
                 }
                 false => {
-                    let values = self.set_store.get(key);
-                    values
+                    self.set_store.get(key)
                 }
             }
         } else {

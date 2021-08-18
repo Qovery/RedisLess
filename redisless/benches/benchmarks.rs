@@ -8,7 +8,7 @@ use redisless::storage::in_memory::InMemoryStorage;
 
 fn criterion_benchmarks(c: &mut Criterion) {
     let port = 3335;
-    let server = Server::new(InMemoryStorage::new(), port);
+    let server = Server::new(InMemoryStorage::default(), port);
     assert_eq!(server.start(), Some(ServerState::Started));
 
     let mut stream = TcpStream::connect(format!("localhost:{}", port)).unwrap();

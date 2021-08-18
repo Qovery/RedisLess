@@ -83,7 +83,7 @@ fn search_peers(listening_port: u16) -> Peers {
         ports.insert(0, DEFAULT_NODE_LISTENING_PORT)
     }
 
-    let peers = scan_ip_range(local_ip_addresses.clone(), ports.clone());
+    let peers = scan_ip_range(local_ip_addresses, ports);
 
     peers
         .into_iter()
