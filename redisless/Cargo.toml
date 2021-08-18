@@ -25,7 +25,6 @@ ipnet = "2.3"
 chrono = "0.4"
 
 [dev-dependencies]
-cfg-if = "1.0.0"
 redis = "0.20"
 serial_test = "0.5"
 criterion = "0.3"

@@ -2,9 +2,6 @@
 #[macro_use]
 extern crate serial_test;
 
-#[cfg(test)]
-extern crate cfg_if;
-
 use storage::in_memory::InMemoryStorage;
 
 use crate::server::{Server, ServerState};
